@@ -166,6 +166,7 @@ const markerMeta: { marker: maplibregl.Marker, type: 'main' | 'sub' }[] = []
 const store = useMapStore()
 const { waypoints, routes, isPlaying, isPaused } = storeToRefs(store)
 
+const isTouchDevice = navigator.maxTouchPoints > 0
 const mapOpacity = ref(1)
 
 function updateMapOpacity(val: number) {
@@ -579,9 +580,13 @@ function redrawMarkers() {
     })
 
     // PC: クリックで削除
+    let singleTapTimer: ReturnType<typeof setTimeout> | null = null
+
+    // PC: クリックで削除（タッチ後の合成clickは除外）
     circle.addEventListener('click', (e) => {
       e.stopPropagation()
-      if (!isDragging) store.removeWaypoint(wp.id)
+      if (isDragging || isTouchDevice) return
+      store.removeWaypoint(wp.id)
     })
 
     // PC: 右クリックでタイプ切り替え
@@ -622,17 +627,24 @@ function redrawMarkers() {
 
     circle.addEventListener('touchend', (e) => {
       e.stopPropagation()
-      if (longPressTimer) {
-        // 長押しでなかった → タップ判定
-        cancelLongPress()
-        const now = Date.now()
-        if (now - lastTapTime < 300) {
-          // ダブルタップ → タイプ切り替え
-          store.toggleType(wp.id)
-          lastTapTime = 0
-        } else {
-          lastTapTime = now
-        }
+      e.preventDefault() // 合成clickを抑制
+
+      if (!longPressTimer) return // 長押し完了済み
+      cancelLongPress()
+
+      const now = Date.now()
+      if (now - lastTapTime < 300) {
+        // ダブルタップ → タイプ切り替え
+        if (singleTapTimer) { clearTimeout(singleTapTimer); singleTapTimer = null }
+        store.toggleType(wp.id)
+        lastTapTime = 0
+      } else {
+        // シングルタップ仮判定 → 300ms後に2回目が来なければ削除
+        lastTapTime = now
+        const capturedTime = now
+        singleTapTimer = setTimeout(() => {
+          if (lastTapTime === capturedTime) store.removeWaypoint(wp.id)
+        }, 300)
       }
     })
 
@@ -1066,6 +1078,13 @@ onUnmounted(() => {
   backdrop-filter: blur(12px);
   padding: 10px 12px;
   padding-bottom: max(10px, env(safe-area-inset-bottom));
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.mobile-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .mob-btn {
