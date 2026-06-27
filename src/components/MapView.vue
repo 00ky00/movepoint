@@ -101,7 +101,7 @@
     <!-- モードピル -->
     <button class="mob-mode-pill sp-only"
       @click="store.setRouteMode(store.routeMode === 'foot' ? 'driving' : 'foot')">
-      <span class="mob-mode-text">{{ store.routeMode === 'foot' ? '歩行' : 'ドライブ' }}</span>
+      <span class="mob-mode-text">{{ store.routeMode === 'foot' ? '散歩' : 'ドライブ' }}</span>
       <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="opacity:0.6;flex-shrink:0">
         <path d="M3 5V8.5L1.5 7 0 8.5 3 11.5 6 8.5 4.5 7 3 8.5V5H3z"/>
         <path d="M9 7V3.5L10.5 5 12 3.5 9 0.5 6 3.5 7.5 5 9 3.5V7H9z"/>
@@ -175,6 +175,7 @@
             placeholder="ラベルを入力（任意）" class="point-sheet-input"
             @keydown.enter="confirmPointSheet" />
           <button class="point-sheet-confirm" @click="confirmPointSheet">完了</button>
+          <button class="point-sheet-delete" @click="deleteFromPointSheet">このポイントを削除</button>
         </div>
       </div>
     </Transition>
@@ -239,6 +240,74 @@
 
     <input ref="fileInputRef" type="file" accept="image/*" class="d-none" @change="onFileSelect" />
 
+    <!-- ヘルプボタン -->
+    <button class="help-btn" @click="showHelpModal = true">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <circle cx="8" cy="8" r="7.5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="8" y="12.5" text-anchor="middle" font-size="10" font-weight="bold" font-family="serif">i</text>
+      </svg>
+    </button>
+
+    <!-- ヘルプモーダル -->
+    <Transition name="mob-fade">
+      <div v-if="showHelpModal" class="help-backdrop" @click.self="showHelpModal = false">
+        <div class="help-modal">
+          <button class="help-close" @click="showHelpModal = false">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <path d="M1 1l12 12M13 1L1 13"/>
+            </svg>
+          </button>
+
+          <div class="help-hero">
+            <div class="help-app-name">ルートスナップ</div>
+            <div class="help-tagline">旅の移動ルートをビジュアルで共有</div>
+          </div>
+
+          <div class="help-steps">
+            <div class="help-step">
+              <div class="help-step-num">1</div>
+              <div class="help-step-body">
+                <div class="help-step-title">地図をタップしてポイントを追加</div>
+                <div class="help-step-desc">行った場所・行く場所をマークする。ポイント間のルートは自動で引かれる。</div>
+              </div>
+            </div>
+            <div class="help-step">
+              <div class="help-step-num">2</div>
+              <div class="help-step-body">
+                <div class="help-step-title">再生してアニメーションを確認</div>
+                <div class="help-step-desc">アイコンがルートに沿って移動する。速度やアイコン画像は自由に変えられる。</div>
+              </div>
+            </div>
+            <div class="help-step">
+              <div class="help-step-num">3</div>
+              <div class="help-step-body">
+                <div class="help-step-title">一時停止 → 保存で画像を出力</div>
+                <div class="help-step-desc">ルートとアイコンが収まった縦長画像（9:16）が生成される。インスタのストーリーにそのまま使える。</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="help-section">
+            <div class="help-section-title">ポイントの種類</div>
+            <div class="help-type-row">
+              <div class="help-dot help-dot--main">1</div>
+              <div>
+                <div class="help-type-name">メイン</div>
+                <div class="help-type-desc">主要な目的地。ラベルをつけられる。保存画像に表示される。</div>
+              </div>
+            </div>
+            <div class="help-type-row">
+              <div class="help-dot help-dot--sub">2</div>
+              <div>
+                <div class="help-type-name">サブ</div>
+                <div class="help-type-desc">経由地。ルートの精度を上げるためのポイント。保存画像には出ない。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
     <!-- キャプチャ待機オーバーレイ -->
     <Transition name="mob-fade">
       <div v-if="isCapturing" class="capture-overlay">
@@ -297,7 +366,7 @@ const TILE_STYLES = [
   { id: 'voyager',   label: 'クリーン', tiles: ['https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'] },
   { id: 'satellite', label: '衛星', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'] },
 ] as const
-const currentTileStyle = ref('osm')
+const currentTileStyle = ref('voyager')
 
 function switchTileStyle(styleId: string) {
   if (!map || !mapLoaded) return
@@ -453,6 +522,7 @@ async function captureImage() {
   }
 }
 
+const showHelpModal = ref(true)
 const panelOpen = ref(true)
 const iconSize = ref(40)
 const labelSize = ref(11)
@@ -466,6 +536,13 @@ function openPointSheet(id: string) {
   if (!wp) return
   pointSheet.value = { id, label: wp.label || '', isMain: wp.type === 'main', order: wp.order }
   nextTick(() => pointSheetInput.value?.focus())
+}
+
+function deleteFromPointSheet() {
+  if (!pointSheet.value) return
+  const id = pointSheet.value.id
+  pointSheet.value = null
+  store.removeWaypoint(id)
 }
 
 function confirmPointSheet() {
@@ -721,7 +798,6 @@ function redrawMarkers() {
     let isDragging = false
     let hoverTimer: ReturnType<typeof setTimeout> | null = null
     let longPressTimer: ReturnType<typeof setTimeout> | null = null
-    let lastTapTime = 0
 
     const marker = new maplibregl.Marker({ element: wrapper, draggable: true })
       .setLngLat([wp.lng, wp.lat])
@@ -734,12 +810,10 @@ function redrawMarkers() {
       setTimeout(() => { isDragging = false }, 0)
     })
 
-    let singleTapTimer: ReturnType<typeof setTimeout> | null = null
-
     circle.addEventListener('click', (e) => {
       e.stopPropagation()
       if (isDragging || isTouchDevice) return
-      store.removeWaypoint(wp.id)
+      openPointSheet(wp.id)
     })
 
     circle.addEventListener('mousedown', (e) => {
@@ -815,19 +889,7 @@ function redrawMarkers() {
 
       if (!longPressTimer) return
       cancelLongPress()
-
-      const now = Date.now()
-      if (now - lastTapTime < 300) {
-        if (singleTapTimer) { clearTimeout(singleTapTimer); singleTapTimer = null }
-        store.toggleType(wp.id)
-        lastTapTime = 0
-      } else {
-        lastTapTime = now
-        const capturedTime = now
-        singleTapTimer = setTimeout(() => {
-          if (lastTapTime === capturedTime) store.removeWaypoint(wp.id)
-        }, 300)
-      }
+      openPointSheet(wp.id)
     })
 
     circle.addEventListener('touchmove', cancelLongPress, { passive: true })
@@ -851,9 +913,9 @@ onMounted(() => {
       sources: {
         osm: {
           type: 'raster',
-          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tiles: ['https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'],
           tileSize: 256,
-          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
         },
       },
       layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
@@ -862,7 +924,6 @@ onMounted(() => {
     zoom: 14,
   } as unknown as maplibregl.MapOptions)
 
-  map.addControl(new maplibregl.NavigationControl(), 'top-left')
   map.on('click', async (e) => {
     const id = await store.addWaypoint(e.lngLat.lat, e.lngLat.lng)
     await nextTick()
@@ -1223,7 +1284,15 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-height: 230px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
 }
+
+.wp-list::-webkit-scrollbar { width: 4px; }
+.wp-list::-webkit-scrollbar-track { background: transparent; }
+.wp-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
 
 .wp-list-item {
   display: flex;
@@ -1584,6 +1653,199 @@ onUnmounted(() => {
   flex: 1;
 }
 
+/* ヘルプボタン */
+.help-btn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  background: rgba(0,0,0,0.75);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  transition: background 0.15s;
+}
+
+.help-btn:hover { background: rgba(0,0,0,0.9); }
+.help-btn:active { background: black; }
+
+@media (max-width: 640px) {
+  .help-btn {
+    top: 16px;
+    left: 16px;
+    width: 40px;
+    height: 40px;
+    background: rgba(0,0,0,0.65);
+    border: 1px solid rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
+    box-shadow: none;
+  }
+  .help-btn:hover { background: rgba(0,0,0,0.85); }
+}
+
+/* ヘルプモーダル */
+.help-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.help-modal {
+  background: rgba(16,16,16,0.98);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 24px;
+  width: min(380px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+  position: relative;
+}
+
+.help-modal::-webkit-scrollbar { display: none; }
+
+.help-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 30px;
+  height: 30px;
+  background: rgba(255,255,255,0.07);
+  border: none;
+  border-radius: 50%;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  z-index: 1;
+}
+.help-close:hover { background: rgba(255,255,255,0.14); color: white; }
+
+.help-hero {
+  padding: 32px 24px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.help-app-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+}
+
+.help-tagline {
+  font-size: 14px;
+  color: rgba(255,255,255,0.45);
+}
+
+.help-steps {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.help-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.help-step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.7);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.help-step-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 4px;
+}
+
+.help-step-desc {
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  line-height: 1.6;
+}
+
+.help-section {
+  padding: 20px 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.help-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.help-type-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.help-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  border: 2px solid rgba(255,255,255,0.4);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.help-dot--main { background: #0d6efd; color: white; }
+.help-dot--sub { background: #ffc107; color: #212529; }
+
+.help-type-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 3px;
+}
+
+.help-type-desc {
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  line-height: 1.6;
+}
+
 /* キャプチャ待機オーバーレイ */
 .capture-overlay {
   position: absolute;
@@ -1729,6 +1991,24 @@ onUnmounted(() => {
 }
 
 .point-sheet-confirm:active { opacity: 0.8; }
+
+.point-sheet-delete {
+  width: 100%;
+  height: 44px;
+  background: transparent;
+  color: rgba(255, 80, 80, 0.8);
+  border: none;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.point-sheet-delete:active {
+  background: rgba(255, 80, 80, 0.1);
+  color: rgba(255, 80, 80, 1);
+}
 
 /* モバイル全画面プレビュー */
 .mob-image-fullscreen {
