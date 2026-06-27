@@ -77,6 +77,23 @@
         </div>
       </div>
 
+      <!-- ウェイポイント一覧 -->
+      <div class="panel-section" v-if="store.waypoints.length > 0">
+        <div class="section-label">ポイント</div>
+        <div class="wp-list">
+          <button v-for="wp in store.waypoints" :key="wp.id"
+            class="wp-list-item" @click="openPointSheet(wp.id)">
+            <div class="wp-list-dot" :class="wp.type === 'main' ? 'wp-dot--main' : 'wp-dot--sub'">
+              {{ wp.order }}
+            </div>
+            <span class="wp-list-label">{{ wp.label || '（ラベルなし）' }}</span>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" class="wp-list-edit-icon">
+              <path d="M9.5 1.5a1.5 1.5 0 012.12 2.12L4.5 10.75 2 11.5l.75-2.5L9.5 1.5z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
       </div> <!-- /pc-panel-content -->
     </div>
 
@@ -131,6 +148,34 @@
         <img v-if="store.icon.startsWith('blob:')" :src="store.icon"
           :style="`width:${iconSize}px;height:${iconSize}px`" class="anim-icon-img" />
         <span v-else :style="`font-size:${iconSize}px;line-height:1`">{{ store.icon }}</span>
+      </div>
+    </Transition>
+
+    <!-- ポイント追加シート backdrop -->
+    <Transition name="mob-fade">
+      <div v-if="pointSheet" class="point-sheet-backdrop" @click="confirmPointSheet"></div>
+    </Transition>
+
+    <!-- ポイント追加シート -->
+    <Transition name="mob-slide">
+      <div v-if="pointSheet" class="point-sheet">
+        <div class="sheet-handle-bar"></div>
+        <div class="point-sheet-body">
+          <div class="point-sheet-row">
+            <div class="point-dot" :class="pointSheet.isMain ? 'point-dot--main' : 'point-dot--sub'">
+              {{ pointSheet.order }}
+            </div>
+            <div v-if="pointSheet.order > 1" class="type-toggle-pill">
+              <button class="type-btn" :class="{ active: pointSheet.isMain }" @click="pointSheet.isMain = true">メイン</button>
+              <button class="type-btn" :class="{ active: !pointSheet.isMain }" @click="pointSheet.isMain = false">サブ</button>
+            </div>
+            <span v-else class="point-type-fixed">メイン（固定）</span>
+          </div>
+          <input v-if="pointSheet.isMain" ref="pointSheetInput" type="text" v-model="pointSheet.label"
+            placeholder="ラベルを入力（任意）" class="point-sheet-input"
+            @keydown.enter="confirmPointSheet" />
+          <button class="point-sheet-confirm" @click="confirmPointSheet">完了</button>
+        </div>
       </div>
     </Transition>
 
@@ -194,6 +239,14 @@
 
     <input ref="fileInputRef" type="file" accept="image/*" class="d-none" @change="onFileSelect" />
 
+    <!-- キャプチャ待機オーバーレイ -->
+    <Transition name="mob-fade">
+      <div v-if="isCapturing" class="capture-overlay">
+        <div class="capture-spinner"></div>
+        <span class="capture-text">準備中...</span>
+      </div>
+    </Transition>
+
     <!-- 画像プレビュー: PC モーダル -->
     <div v-if="showImageModal" class="modal-backdrop image-modal-backdrop pc-only" @click.self="showImageModal = false">
       <div class="image-modal-box">
@@ -214,7 +267,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import maplibregl from 'maplibre-gl'
 import type { GeoJSONSource } from 'maplibre-gl'
@@ -225,6 +278,7 @@ let map: maplibregl.Map | null = null
 let mapLoaded = false
 const markers: maplibregl.Marker[] = []
 const markerMeta: { marker: maplibregl.Marker, type: 'main' | 'sub' }[] = []
+const touchDragCleanups: (() => void)[] = []
 const store = useMapStore()
 const { waypoints, routes, isPlaying, isPaused } = storeToRefs(store)
 
@@ -259,9 +313,21 @@ function switchTileStyle(styleId: string) {
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const showImageModal = ref(false)
 const capturedImageUrl = ref('')
+const isCapturing = ref(false)
+
+function waitForMapReady(): Promise<void> {
+  return new Promise(resolve => {
+    const check = () => {
+      if (map!.areTilesLoaded()) resolve()
+      else map!.once('idle', check)
+    }
+    map!.once('idle', check)
+  })
+}
 
 async function captureImage() {
   if (!map || !mapLoaded) return
+  isCapturing.value = true
   const allCoords = store.routes.flat()
   if (allCoords.length === 0) return
 
@@ -295,13 +361,13 @@ async function captureImage() {
     new maplibregl.LngLatBounds([Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]),
     { padding: fitPad, duration: 0 }
   )
-  await new Promise<void>(resolve => map!.once('idle', resolve))
+  await waitForMapReady()
 
   // ルートを全表示してから再描画を待つ
   map.setPaintProperty('routes', 'line-opacity', 0.8)
   map.setLayoutProperty('routes-trail', 'visibility', 'none')
   map.triggerRepaint()
-  await new Promise<void>(resolve => map!.once('idle', resolve))
+  await waitForMapReady()
 
   const outW = 1080, outH = 1920
   const outCanvas = document.createElement('canvas')
@@ -375,9 +441,11 @@ async function captureImage() {
   }
 
   capturedImageUrl.value = outCanvas.toDataURL('image/png')
+  isCapturing.value = false
   showImageModal.value = true
 
   // 状態を戻す
+  isCapturing.value = false
   map.jumpTo({ center: prevCenter, zoom: prevZoom })
   if (store.isPaused) {
     map.setPaintProperty('routes', 'line-opacity', 0.2)
@@ -388,6 +456,29 @@ async function captureImage() {
 const panelOpen = ref(true)
 const iconSize = ref(40)
 const labelSize = ref(11)
+
+// ポイント追加シート（モバイル）
+const pointSheet = ref<{ id: string; label: string; isMain: boolean; order: number } | null>(null)
+const pointSheetInput = ref<HTMLInputElement | null>(null)
+
+function openPointSheet(id: string) {
+  const wp = store.waypoints.find(w => w.id === id)
+  if (!wp) return
+  pointSheet.value = { id, label: wp.label || '', isMain: wp.type === 'main', order: wp.order }
+  nextTick(() => pointSheetInput.value?.focus())
+}
+
+function confirmPointSheet() {
+  if (!pointSheet.value) return
+  const { id, label, isMain } = pointSheet.value
+  store.setLabel(id, label)
+  const wp = store.waypoints.find(w => w.id === id)
+  if (wp && wp.order > 1 && (wp.type === 'main') !== isMain) {
+    store.toggleType(id)
+  }
+  pointSheet.value = null
+  nextTick(redrawMarkers)
+}
 
 // モバイルボトムシート
 const showBottomSheet = ref(false)
@@ -468,7 +559,7 @@ function startAnimation() {
   if (coords.length < 2) return
 
   if (mapLoaded) {
-    map!.setPaintProperty('routes', 'line-opacity', 0.2)
+    map!.setPaintProperty('routes', 'line-opacity', 0.8)
     map!.setLayoutProperty('routes-trail', 'visibility', 'visible')
   }
 
@@ -613,7 +704,7 @@ function showLabelInput(id: string) {
 
 function updateSubMarkerVisibility() {
   markerMeta.forEach(({ marker, type }) => {
-    const shouldHide = store.isPlaying || (store.isPaused && type === 'sub')
+    const shouldHide = (store.isPlaying || store.isPaused) && type === 'sub'
     marker.getElement().style.visibility = shouldHide ? 'hidden' : 'visible'
   })
 }
@@ -622,6 +713,8 @@ function redrawMarkers() {
   markers.forEach(m => m.remove())
   markers.length = 0
   markerMeta.length = 0
+  touchDragCleanups.forEach(fn => fn())
+  touchDragCleanups.length = 0
 
   store.waypoints.forEach(wp => {
     const { wrapper, circle } = createMarkerEl(wp.order, wp.type, wp.label)
@@ -670,11 +763,17 @@ function redrawMarkers() {
       if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null }
     })
 
+    let isDraggingTouch = false
+
     circle.addEventListener('touchstart', (e) => {
       e.stopPropagation()
       longPressTimer = setTimeout(() => {
         longPressTimer = null
-        showLabelInput(wp.id)
+        isDraggingTouch = true
+        map?.dragPan.disable()
+        wrapper.style.transition = 'transform 0.15s'
+        wrapper.style.transform = 'scale(1.3)'
+        wrapper.style.zIndex = '50'
       }, 600)
     }, { passive: true })
 
@@ -682,7 +781,35 @@ function redrawMarkers() {
       if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null }
     }
 
+    const handleDragMove = (e: TouchEvent) => {
+      if (!isDraggingTouch) return
+      const touch = e.touches[0]
+      const rect = mapContainer.value!.getBoundingClientRect()
+      const lngLat = map!.unproject([touch.clientX - rect.left, touch.clientY - rect.top])
+      marker.setLngLat([lngLat.lng, lngLat.lat])
+    }
+
+    const handleDragEnd = () => {
+      if (!isDraggingTouch) return
+      isDraggingTouch = false
+      map?.dragPan.enable()
+      wrapper.style.transform = ''
+      wrapper.style.zIndex = ''
+      const lngLat = marker.getLngLat()
+      store.updatePosition(wp.id, lngLat.lat, lngLat.lng)
+    }
+
+    mapContainer.value?.addEventListener('touchmove', handleDragMove, { passive: true })
+    mapContainer.value?.addEventListener('touchend', handleDragEnd, { passive: true })
+    mapContainer.value?.addEventListener('touchcancel', handleDragEnd, { passive: true })
+    touchDragCleanups.push(() => {
+      mapContainer.value?.removeEventListener('touchmove', handleDragMove)
+      mapContainer.value?.removeEventListener('touchend', handleDragEnd)
+      mapContainer.value?.removeEventListener('touchcancel', handleDragEnd)
+    })
+
     circle.addEventListener('touchend', (e) => {
+      if (isDraggingTouch) return  // ドラッグ終了はmapContainerリスナーで処理
       e.stopPropagation()
       e.preventDefault()
 
@@ -736,8 +863,10 @@ onMounted(() => {
   } as unknown as maplibregl.MapOptions)
 
   map.addControl(new maplibregl.NavigationControl(), 'top-left')
-  map.on('click', (e) => {
-    store.addWaypoint(e.lngLat.lat, e.lngLat.lng)
+  map.on('click', async (e) => {
+    const id = await store.addWaypoint(e.lngLat.lat, e.lngLat.lng)
+    await nextTick()
+    openPointSheet(id)
   })
 
   map.on('load', () => {
@@ -1089,6 +1218,64 @@ onUnmounted(() => {
   color: white;
 }
 
+/* ウェイポイント一覧 */
+.wp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wp-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  cursor: pointer;
+  color: white;
+  transition: background 0.15s;
+  width: 100%;
+  text-align: left;
+}
+
+.wp-list-item:hover { background: rgba(255,255,255,0.1); }
+
+.wp-list-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: bold;
+  color: white;
+  border: 2px solid rgba(255,255,255,0.4);
+  flex-shrink: 0;
+}
+
+.wp-dot--main { background: #0d6efd; }
+.wp-dot--sub { background: #ffc107; color: #212529; }
+
+.wp-list-label {
+  flex: 1;
+  font-size: 13px;
+  color: rgba(255,255,255,0.65);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wp-list-edit-icon {
+  color: rgba(255,255,255,0.25);
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.wp-list-item:hover .wp-list-edit-icon { color: rgba(255,255,255,0.6); }
+
 .modal-backdrop {
   position: absolute;
   inset: 0;
@@ -1396,6 +1583,152 @@ onUnmounted(() => {
   gap: 10px;
   flex: 1;
 }
+
+/* キャプチャ待機オーバーレイ */
+.capture-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.capture-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255,255,255,0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.capture-text {
+  color: rgba(255,255,255,0.8);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ポイント追加シート */
+.point-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 28;
+  background: rgba(0,0,0,0.4);
+}
+
+.point-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  background: rgba(18, 18, 18, 0.97);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(24px);
+  flex-direction: column;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  display: flex;
+}
+
+.point-sheet-body {
+  padding: 12px 20px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.point-sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.point-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  color: white;
+  border: 2px solid rgba(255,255,255,0.8);
+  flex-shrink: 0;
+}
+
+.point-dot--main { background: #0d6efd; }
+.point-dot--sub { background: #ffc107; color: #212529; }
+
+.type-toggle-pill {
+  display: flex;
+  background: rgba(255,255,255,0.07);
+  border-radius: 20px;
+  padding: 3px;
+}
+
+.type-btn {
+  padding: 6px 18px;
+  border-radius: 16px;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.4);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.type-btn.active {
+  background: rgba(255,255,255,0.15);
+  color: white;
+}
+
+.point-type-fixed {
+  color: rgba(255,255,255,0.3);
+  font-size: 12px;
+}
+
+.point-sheet-input {
+  width: 100%;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  color: white;
+  font-size: 16px;
+  padding: 14px 16px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.point-sheet-input::placeholder { color: rgba(255,255,255,0.2); }
+.point-sheet-input:focus { border-color: rgba(255,255,255,0.3); }
+
+.point-sheet-confirm {
+  width: 100%;
+  height: 52px;
+  background: white;
+  color: #111;
+  border: none;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.point-sheet-confirm:active { opacity: 0.8; }
 
 /* モバイル全画面プレビュー */
 .mob-image-fullscreen {

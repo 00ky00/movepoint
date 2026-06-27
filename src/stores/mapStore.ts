@@ -39,6 +39,8 @@ export const useMapStore = defineStore('map', {
         const coords = await fetchRoute(prev, wp, this.routeMode)
         this.routes.push(coords)
       }
+
+      return wp.id
     },
 
     async removeWaypoint(id: string) {
