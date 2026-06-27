@@ -10,15 +10,15 @@ export const useMapStore = defineStore('map', {
     isPaused: boolean
     speed: number
     icon: string
-    customIcons: string[]
+    routeMode: 'foot' | 'driving'
   } => ({
     waypoints: [],
     routes: [],
     isPlaying: false,
     isPaused: false,
     speed: 1,
-    icon: '🚗',
-    customIcons: [] as string[],
+    icon: '🚶',
+    routeMode: 'foot',
   }),
   getters: {
     canPlay: (state) => state.routes.length > 0 && state.routes.some(r => r.length > 0),
@@ -36,7 +36,7 @@ export const useMapStore = defineStore('map', {
 
       if (this.waypoints.length >= 2) {
         const prev = this.waypoints[this.waypoints.length - 2]
-        const coords = await fetchRoute(prev, wp)
+        const coords = await fetchRoute(prev, wp, this.routeMode)
         this.routes.push(coords)
       }
     },
@@ -59,7 +59,7 @@ export const useMapStore = defineStore('map', {
         this.routes.splice(this.routes.length - 1, 1)
       } else {
         this.routes.splice(idx - 1, 2)
-        const coords = await fetchRoute(this.waypoints[idx - 1], this.waypoints[idx])
+        const coords = await fetchRoute(this.waypoints[idx - 1], this.waypoints[idx], this.routeMode)
         this.routes.splice(idx - 1, 0, coords)
       }
     },
@@ -74,14 +74,30 @@ export const useMapStore = defineStore('map', {
       if (idx > 0) {
         const from = this.waypoints[idx - 1]
         const to = this.waypoints[idx]
-        promises.push(fetchRoute(from, to).then(coords => { this.routes[idx - 1] = coords }))
+        promises.push(fetchRoute(from, to, this.routeMode).then(coords => { this.routes[idx - 1] = coords }))
       }
       if (idx < this.waypoints.length - 1) {
         const from = this.waypoints[idx]
         const to = this.waypoints[idx + 1]
-        promises.push(fetchRoute(from, to).then(coords => { this.routes[idx] = coords }))
+        promises.push(fetchRoute(from, to, this.routeMode).then(coords => { this.routes[idx] = coords }))
       }
       await Promise.all(promises)
+    },
+
+    async setRouteMode(mode: 'foot' | 'driving') {
+      if (this.routeMode === mode) return
+      this.routeMode = mode
+      if (!this.icon.startsWith('blob:')) {
+        this.icon = mode === 'foot' ? '🚶' : '🚗'
+      }
+
+      if (this.waypoints.length < 2) return
+      const newRoutes = await Promise.all(
+        this.waypoints.slice(0, -1).map((wp, i) =>
+          fetchRoute(wp, this.waypoints[i + 1], mode)
+        )
+      )
+      this.routes = newRoutes
     },
 
     toggleType(id: string) {

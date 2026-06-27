@@ -1,158 +1,192 @@
 <template>
   <div ref="mapContainer" id="map">
-    <!-- 撮影モード：スマホ枠 -->
-    <div
-      v-if="isRecordingMode"
-      class="phone-frame"
-      :style="{ width: frameSize.width + 'px', height: frameSize.height + 'px' }"
-    ></div>
+    <!-- PC 右サイドパネル -->
+    <div class="pc-panel pc-only" :class="{ 'pc-panel--closed': !panelOpen }">
+      <button class="panel-toggle-btn" @click="panelOpen = !panelOpen">{{ panelOpen ? '›' : '‹' }}</button>
 
-    <!-- 撮影モード終了ボタン -->
-    <button v-if="isRecordingMode" class="record-exit-btn" @click="exitRecording" title="撮影モード終了">✕</button>
+      <div class="pc-panel-content" v-show="panelOpen">
 
-    <!-- PC オーバーレイ -->
-    <div class="playback-overlay pc-only" v-if="!isRecordingMode">
-      <template v-if="store.canPlay">
-        <template v-if="!store.isPlaying && !store.isPaused">
-          <button class="overlay-btn" @click="store.play()">▶</button>
-        </template>
-        <template v-else-if="store.isPlaying">
-          <button class="overlay-btn" @click="store.pause()">⏸</button>
-          <button class="overlay-btn" @click="store.stop()">⏹</button>
-        </template>
-        <template v-else>
-          <button class="overlay-btn" @click="store.play()">▶</button>
-          <button class="overlay-btn" @click="store.stop()">⏹</button>
-        </template>
-        <div class="overlay-divider"></div>
-        <div class="overlay-group">
-          <span class="overlay-label">速度</span>
-          <input type="range" min="1" max="30" step="1" :value="store.speed"
-            @input="store.speed = Number(($event.target as HTMLInputElement).value)" class="overlay-slider" />
-          <span class="overlay-label">{{ store.speed }}x</span>
+      <!-- モード -->
+      <div class="panel-section">
+        <div class="section-label">ルートモード</div>
+        <div class="mode-toggle">
+          <span class="mode-icon" :class="{ active: store.routeMode === 'foot' }">🚶</span>
+          <div class="toggle-track" @click="store.setRouteMode(store.routeMode === 'foot' ? 'driving' : 'foot')">
+            <div class="toggle-thumb" :class="{ right: store.routeMode === 'driving' }"></div>
+          </div>
+          <span class="mode-icon" :class="{ active: store.routeMode === 'driving' }">🚗</span>
         </div>
-        <div class="overlay-divider"></div>
-      </template>
-      <div class="overlay-group">
-        <button v-for="s in TILE_STYLES" :key="s.id" class="ratio-btn"
-          :class="{ active: currentTileStyle === s.id }" @click="switchTileStyle(s.id)">{{ s.label }}</button>
       </div>
-      <div class="overlay-divider"></div>
-      <div class="overlay-group">
-        <span class="overlay-label">🗺</span>
+
+      <!-- 速度 -->
+      <div class="panel-section">
+        <div class="section-label">速度 {{ store.speed }}x</div>
+        <input type="range" min="1" max="30" step="1" :value="store.speed"
+          @input="store.speed = Number(($event.target as HTMLInputElement).value)"
+          class="panel-slider" />
+      </div>
+
+      <!-- マップスタイル -->
+      <div class="panel-section">
+        <div class="section-label">マップ</div>
+        <div class="tile-grid">
+          <button v-for="s in TILE_STYLES" :key="s.id"
+            class="tile-btn" :class="{ active: currentTileStyle === s.id }"
+            @click="switchTileStyle(s.id)">{{ s.label }}</button>
+        </div>
+      </div>
+
+      <!-- 透過 -->
+      <div class="panel-section">
+        <div class="section-label">透過</div>
         <input type="range" min="0.1" max="1" step="0.05" :value="mapOpacity"
-          @input="updateMapOpacity(Number(($event.target as HTMLInputElement).value))" class="overlay-slider" />
+          @input="updateMapOpacity(Number(($event.target as HTMLInputElement).value))"
+          class="panel-slider" />
       </div>
-      <div class="overlay-divider"></div>
-      <div class="overlay-group">
-        <button v-for="r in RATIOS" :key="r" class="ratio-btn"
-          :class="{ active: aspectRatio === r }" @click="aspectRatio = r">{{ r }}</button>
-      </div>
-      <div class="overlay-divider"></div>
-      <button class="overlay-btn" @click="enterRecording">📷</button>
-      <button class="overlay-btn" @click="store.reset()">🗑</button>
-      <div class="icon-picker-wrap">
-        <button class="overlay-btn icon-btn" @click="showIconPicker = !showIconPicker">
-          <img v-if="store.icon.startsWith('blob:')" :src="store.icon" class="icon-option-img" />
-          <span v-else>{{ store.icon }}</span>
-        </button>
-        <div v-if="showIconPicker" class="icon-picker-popup">
-          <button v-for="ic in ICON_OPTIONS" :key="ic" class="icon-option"
-            :class="{ active: store.icon === ic }" @click="store.icon = ic; showIconPicker = false">{{ ic }}</button>
-          <button v-for="url in store.customIcons" :key="url" class="icon-option"
-            :class="{ active: store.icon === url }" @click="store.icon = url; showIconPicker = false">
-            <img :src="url" class="icon-option-img" />
-          </button>
-          <button class="icon-option icon-add" @click="fileInputRef?.click()">＋</button>
-        </div>
-      </div>
-    </div>
 
-    <!-- モバイル オーバーレイ -->
-    <div class="mobile-overlay sp-only" v-if="!isRecordingMode">
-      <!-- パネル -->
-      <div v-if="activePanel" class="mobile-panel">
-        <div v-if="activePanel === 'speed'" class="mobile-panel-content">
-          <span class="panel-label">速度</span>
-          <input type="range" min="1" max="30" step="1" :value="store.speed"
-            @input="store.speed = Number(($event.target as HTMLInputElement).value)" class="panel-slider" />
-          <span class="panel-label">{{ store.speed }}x</span>
-        </div>
-        <div v-if="activePanel === 'opacity'" class="mobile-panel-content">
-          <span class="panel-label">🗺</span>
-          <input type="range" min="0.1" max="1" step="0.05" :value="mapOpacity"
-            @input="updateMapOpacity(Number(($event.target as HTMLInputElement).value))" class="panel-slider" />
-        </div>
-        <div v-if="activePanel === 'tile'" class="mobile-panel-content">
-          <button v-for="s in TILE_STYLES" :key="s.id" class="panel-chip"
-            :class="{ active: currentTileStyle === s.id }"
-            @click="switchTileStyle(s.id); activePanel = null">{{ s.label }}</button>
-        </div>
-        <div v-if="activePanel === 'ratio'" class="mobile-panel-content">
-          <button v-for="r in RATIOS" :key="r" class="panel-chip"
-            :class="{ active: aspectRatio === r }"
-            @click="aspectRatio = r; activePanel = null">{{ r }}</button>
-        </div>
-        <div v-if="activePanel === 'icon'" class="mobile-panel-content icon-grid">
-          <button v-for="ic in ICON_OPTIONS" :key="ic" class="panel-icon-btn"
-            :class="{ active: store.icon === ic }"
-            @click="store.icon = ic; activePanel = null">{{ ic }}</button>
-          <button v-for="url in store.customIcons" :key="url" class="panel-icon-btn"
-            :class="{ active: store.icon === url }"
-            @click="store.icon = url; activePanel = null">
-            <img :src="url" class="icon-option-img" />
-          </button>
-          <button class="panel-icon-btn" @click="fileInputRef?.click()">＋</button>
+      <!-- 再生コントロール -->
+      <div class="panel-section panel-controls">
+        <button
+          class="ctrl-btn ctrl-btn--play"
+          :disabled="!store.canPlay"
+          @click="store.isPlaying ? store.pause() : store.play()"
+        >{{ store.isPlaying ? '⏸' : '▶' }}</button>
+        <button class="ctrl-btn" :disabled="!store.isPlaying && !store.isPaused" @click="store.stop()">⏹</button>
+        <button class="ctrl-btn ctrl-btn--text" :disabled="!store.isPaused" @click="captureImage">保存</button>
+        <button class="ctrl-btn ctrl-btn--text" @click="store.reset()">リセット</button>
+      </div>
+
+      <!-- アイコン / ラベル -->
+      <div class="panel-section">
+        <div class="section-label">アイコン {{ iconSize }}px</div>
+        <input type="range" min="16" max="80" step="2" :value="iconSize"
+          @input="iconSize = Number(($event.target as HTMLInputElement).value)"
+          class="panel-slider" style="margin-bottom:14px" />
+        <div class="section-label">ラベル {{ labelSize }}px</div>
+        <input type="range" min="8" max="24" step="1" :value="labelSize"
+          @input="labelSize = Number(($event.target as HTMLInputElement).value)"
+          class="panel-slider" style="margin-bottom:10px" />
+        <div class="icon-row">
+          <div class="icon-preview">
+            <img v-if="store.icon.startsWith('blob:')" :src="store.icon" class="icon-preview-img" />
+            <span v-else class="icon-preview-emoji">{{ store.icon }}</span>
+          </div>
+          <button class="icon-upload-btn" @click="fileInputRef?.click()">画像を選択</button>
+          <button v-if="store.icon.startsWith('blob:')" class="icon-reset-btn"
+            @click="store.icon = store.routeMode === 'foot' ? '🚶' : '🚗'">✕</button>
         </div>
       </div>
 
-      <!-- アイコンバー -->
-      <div class="mobile-bar">
-        <template v-if="store.canPlay">
-          <template v-if="!store.isPlaying && !store.isPaused">
-            <button class="mob-btn" @click="store.play()">▶</button>
-          </template>
-          <template v-else-if="store.isPlaying">
-            <button class="mob-btn" @click="store.pause()">⏸</button>
-            <button class="mob-btn" @click="store.stop()">⏹</button>
-          </template>
-          <template v-else>
-            <button class="mob-btn" @click="store.play()">▶</button>
-            <button class="mob-btn" @click="store.stop()">⏹</button>
-          </template>
-          <button class="mob-btn mob-btn--label" :class="{ active: activePanel === 'speed' }"
-            @click="togglePanel('speed')">{{ store.speed }}x</button>
-          <div class="mob-divider"></div>
-        </template>
-        <button class="mob-btn" :class="{ active: activePanel === 'opacity' }" @click="togglePanel('opacity')">🗺</button>
-        <button class="mob-btn" :class="{ active: activePanel === 'tile' }" @click="togglePanel('tile')">🌍</button>
-        <button class="mob-btn" :class="{ active: activePanel === 'ratio' }" @click="togglePanel('ratio')">📐</button>
-        <button class="mob-btn" @click="enterRecording">📷</button>
-        <button class="mob-btn" @click="store.reset()">🗑</button>
-        <button class="mob-btn" :class="{ active: activePanel === 'icon' }" @click="togglePanel('icon')">
-          <img v-if="store.icon.startsWith('blob:')" :src="store.icon" class="icon-option-img" />
-          <span v-else>{{ store.icon }}</span>
-        </button>
-      </div>
+      </div> <!-- /pc-panel-content -->
     </div>
+
+    <!-- モバイル UI (Stories スタイル) -->
+    <!-- モードピル -->
+    <button class="mob-mode-pill sp-only"
+      @click="store.setRouteMode(store.routeMode === 'foot' ? 'driving' : 'foot')">
+      <span>{{ store.routeMode === 'foot' ? '🚶' : '🚗' }}</span>
+      <span class="mob-mode-text">{{ store.routeMode === 'foot' ? '歩行' : 'ドライブ' }}</span>
+    </button>
+
+    <!-- 設定ボタン -->
+    <button class="mob-settings-btn sp-only" @click="showBottomSheet = true">⚙</button>
+
+    <!-- 停止FAB（再生/一時停止中のみ） -->
+    <Transition name="mob-fade">
+      <button v-if="store.isPlaying || store.isPaused" class="mob-stop-fab sp-only" @click="store.stop()">⏹</button>
+    </Transition>
+
+    <!-- 下部アクションバー -->
+    <div class="mob-action-bar sp-only">
+      <button class="mob-side-btn mob-side-btn--text" @click="store.reset()">リセット</button>
+      <button class="mob-play-btn" :disabled="!store.canPlay"
+        @click="store.isPlaying ? store.pause() : store.play()">
+        {{ store.isPlaying ? '⏸' : '▶' }}
+      </button>
+      <button class="mob-side-btn mob-side-btn--text" :disabled="!store.isPaused" @click="captureImage">保存</button>
+    </div>
+
+    <!-- ボトムシート backdrop -->
+    <Transition name="mob-fade">
+      <div v-if="showBottomSheet" class="sheet-backdrop sp-only" @click="showBottomSheet = false"></div>
+    </Transition>
+
+    <!-- ボトムシート -->
+    <Transition name="mob-slide">
+      <div v-if="showBottomSheet" class="bottom-sheet sp-only"
+        :style="sheetDragY > 0 ? { transform: `translateY(${sheetDragY}px)`, transition: 'none' } : {}"
+        @touchstart.passive="onSheetTouchStart"
+        @touchmove.passive="onSheetTouchMove"
+        @touchend="onSheetTouchEnd">
+        <div class="sheet-handle-bar"></div>
+        <div class="sheet-body">
+          <div class="sheet-row">
+            <span class="sheet-label">速度 {{ store.speed }}x</span>
+            <input type="range" min="1" max="30" step="1" :value="store.speed"
+              @input="store.speed = Number(($event.target as HTMLInputElement).value)" class="sheet-slider" />
+          </div>
+          <div class="sheet-row">
+            <span class="sheet-label">マップ</span>
+            <div class="sheet-chips">
+              <button v-for="s in TILE_STYLES" :key="s.id"
+                class="sheet-chip" :class="{ active: currentTileStyle === s.id }"
+                @click="switchTileStyle(s.id)">{{ s.label }}</button>
+            </div>
+          </div>
+          <div class="sheet-row">
+            <span class="sheet-label">透過</span>
+            <input type="range" min="0.1" max="1" step="0.05" :value="mapOpacity"
+              @input="updateMapOpacity(Number(($event.target as HTMLInputElement).value))" class="sheet-slider" />
+          </div>
+          <div class="sheet-row">
+            <span class="sheet-label">アイコン {{ iconSize }}px</span>
+            <input type="range" min="16" max="80" step="2" :value="iconSize"
+              @input="iconSize = Number(($event.target as HTMLInputElement).value)" class="sheet-slider" />
+          </div>
+          <div class="sheet-row">
+            <span class="sheet-label">ラベル {{ labelSize }}px</span>
+            <input type="range" min="8" max="24" step="1" :value="labelSize"
+              @input="labelSize = Number(($event.target as HTMLInputElement).value)" class="sheet-slider" />
+          </div>
+          <div class="sheet-row">
+            <span class="sheet-label">アイコン画像</span>
+            <div class="sheet-icon-row">
+              <div class="icon-preview">
+                <img v-if="store.icon.startsWith('blob:')" :src="store.icon" class="icon-preview-img" />
+                <span v-else class="icon-preview-emoji">{{ store.icon }}</span>
+              </div>
+              <button class="sheet-chip" @click="fileInputRef?.click()">画像を選択</button>
+              <button v-if="store.icon.startsWith('blob:')" class="sheet-chip sheet-chip--reset"
+                @click="store.icon = store.routeMode === 'foot' ? '🚶' : '🚗'">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <input ref="fileInputRef" type="file" accept="image/*" class="d-none" @change="onFileSelect" />
 
-    <!-- 保存モーダル -->
-    <div v-if="showSaveModal" class="modal-backdrop">
-      <div class="modal-box">
-        <p class="modal-title">録画を保存しますか？</p>
-        <div class="modal-actions">
-          <button class="modal-btn modal-btn--primary" @click="saveRecording">はい</button>
-          <button class="modal-btn modal-btn--secondary" @click="discardRecording">いいえ</button>
-        </div>
+    <!-- 画像プレビュー: PC モーダル -->
+    <div v-if="showImageModal" class="modal-backdrop image-modal-backdrop pc-only" @click.self="showImageModal = false">
+      <div class="image-modal-box">
+        <button class="image-modal-close" @click="showImageModal = false">✕</button>
+        <img :src="capturedImageUrl" class="image-modal-preview" />
+        <p class="image-modal-hint">右クリック → 画像を保存</p>
+        <a :href="capturedImageUrl" download="movepoint.png" class="image-modal-download">ダウンロード</a>
       </div>
+    </div>
+
+    <!-- 画像プレビュー: モバイル全画面 -->
+    <div v-if="showImageModal" class="mob-image-fullscreen sp-only">
+      <button class="mob-image-close" @click="showImageModal = false">✕</button>
+      <img :src="capturedImageUrl" class="mob-image-img" />
+      <p class="mob-image-hint">長押しで保存</p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import maplibregl from 'maplibre-gl'
 import type { GeoJSONSource } from 'maplibre-gl'
@@ -194,36 +228,157 @@ function switchTileStyle(styleId: string) {
   map.addLayer({ id: 'osm', type: 'raster', source: 'osm', paint: { 'raster-opacity': mapOpacity.value } }, 'routes-trail')
 }
 
-const ICON_OPTIONS = ['🚗','🚶','🏃','🚴','✈️','🚢','🚂','🚁','🛵','🐾']
-const showIconPicker = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const showImageModal = ref(false)
+const capturedImageUrl = ref('')
 
-// モバイルパネル
-const activePanel = ref<string | null>(null)
-function togglePanel(name: string) {
-  activePanel.value = activePanel.value === name ? null : name
+async function captureImage() {
+  if (!map || !mapLoaded) return
+  const allCoords = store.routes.flat()
+  if (allCoords.length === 0) return
+
+  const prevCenter = map.getCenter()
+  const prevZoom = map.getZoom()
+
+  const dpr = window.devicePixelRatio || 1
+
+  // クロップ寸法を先に計算してfitBoundsのpaddingに反映
+  const mapCanvas = map.getCanvas()
+  const cw = mapCanvas.width   // 物理ピクセル
+  const ch = mapCanvas.height  // 物理ピクセル
+  const targetAspect = 9 / 16
+  const basePad = 80           // CSS論理ピクセル
+
+  let sx: number, sy: number, sw: number, sh: number
+  let fitPad: { top: number; bottom: number; left: number; right: number }
+  if (cw / ch > targetAspect) {
+    sh = ch; sw = Math.round(ch * targetAspect); sx = Math.round((cw - sw) / 2); sy = 0
+    const extra = (cw - sw) / 2 / dpr  // 論理ピクセルに変換
+    fitPad = { top: basePad, bottom: basePad, left: basePad + extra, right: basePad + extra }
+  } else {
+    sw = cw; sh = Math.round(cw / targetAspect); sx = 0; sy = Math.round((ch - sh) / 2)
+    const extra = (ch - sh) / 2 / dpr  // 論理ピクセルに変換
+    fitPad = { top: basePad + extra, bottom: basePad + extra, left: basePad, right: basePad }
+  }
+
+  const lngs = allCoords.map(c => c[0])
+  const lats = allCoords.map(c => c[1])
+  map.fitBounds(
+    new maplibregl.LngLatBounds([Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]),
+    { padding: fitPad, duration: 0 }
+  )
+  await new Promise<void>(resolve => map!.once('idle', resolve))
+
+  // ルートを全表示してから再描画を待つ
+  map.setPaintProperty('routes', 'line-opacity', 0.8)
+  map.setLayoutProperty('routes-trail', 'visibility', 'none')
+  map.triggerRepaint()
+  await new Promise<void>(resolve => map!.once('idle', resolve))
+
+  const outW = 1080, outH = 1920
+  const outCanvas = document.createElement('canvas')
+  outCanvas.width = outW; outCanvas.height = outH
+  const ctx = outCanvas.getContext('2d')!
+
+  // マップ本体を描画
+  ctx.drawImage(mapCanvas, sx, sy, sw, sh, 0, 0, outW, outH)
+
+  const scaleX = outW / sw
+  const scaleY = outH / sh
+
+  function project(lng: number, lat: number): { x: number; y: number } {
+    const px = map!.project([lng, lat])
+    // project() は論理ピクセルを返すので dpr を掛けて物理ピクセルに揃える
+    return { x: (px.x * dpr - sx) * scaleX, y: (px.y * dpr - sy) * scaleY }
+  }
+
+  // ウェイポイントマーカーを描画（mainのみ）
+  const r = 24
+  store.waypoints.filter(wp => wp.type === 'main').forEach(wp => {
+    const { x, y } = project(wp.lng, wp.lat)
+
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fillStyle = wp.type === 'main' ? '#0d6efd' : '#ffc107'
+    ctx.fill()
+    ctx.strokeStyle = 'white'
+    ctx.lineWidth = 3
+    ctx.stroke()
+
+    ctx.fillStyle = wp.type === 'main' ? 'white' : '#212529'
+    ctx.font = 'bold 18px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(wp.order), x, y)
+
+    if (wp.label) {
+      const labelY = y + r + 6
+      const drawLabelSize = Math.round(labelSize.value * outW * dpr / sw)
+      ctx.font = `${drawLabelSize}px sans-serif`
+      const tw = ctx.measureText(wp.label).width
+      const lw = tw + 16, lh = drawLabelSize + 10
+      ctx.fillStyle = 'rgba(0,0,0,0.65)'
+      ctx.beginPath()
+      ctx.roundRect(x - lw / 2, labelY, lw, lh, 5)
+      ctx.fill()
+      ctx.fillStyle = 'white'
+      ctx.textBaseline = 'top'
+      ctx.fillText(wp.label, x, labelY + 5)
+    }
+  })
+
+  // アニメーションアイコンを描画
+  if (currentAnimPos) {
+    const { x, y } = project(currentAnimPos[0], currentAnimPos[1])
+    const drawSize = Math.round(iconSize.value * outW * dpr / sw)
+    if (!store.icon.startsWith('blob:')) {
+      ctx.font = `${drawSize}px serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(store.icon, x, y)
+    } else {
+      await new Promise<void>(resolve => {
+        const img = new Image()
+        img.onload = () => { ctx.drawImage(img, x - drawSize / 2, y - drawSize / 2, drawSize, drawSize); resolve() }
+        img.onerror = () => resolve()
+        img.src = store.icon
+      })
+    }
+  }
+
+  capturedImageUrl.value = outCanvas.toDataURL('image/png')
+  showImageModal.value = true
+
+  // 状態を戻す
+  map.jumpTo({ center: prevCenter, zoom: prevZoom })
+  if (store.isPaused) {
+    map.setPaintProperty('routes', 'line-opacity', 0.2)
+    map.setLayoutProperty('routes-trail', 'visibility', 'visible')
+  }
 }
 
-const RATIOS = ['9:16', '1:1', '16:9'] as const
-type Ratio = typeof RATIOS[number]
-const aspectRatio = ref<Ratio>('9:16')
-const frameSize = computed(() => {
-  const sizes: Record<Ratio, { width: number; height: number }> = {
-    '9:16': { width: 390, height: 693 },
-    '1:1':  { width: 400, height: 400 },
-    '16:9': { width: 640, height: 360 },
-  }
-  return sizes[aspectRatio.value]
-})
+const panelOpen = ref(true)
+const iconSize = ref(40)
+const labelSize = ref(11)
 
-// 撮影モード
-const isRecordingMode = ref(false)
+// モバイルボトムシート
+const showBottomSheet = ref(false)
+const sheetDragY = ref(0)
+let sheetStartY = 0
 
-// 録画
-let mediaRecorder: MediaRecorder | null = null
-let recordingRafId: number | null = null
-const showSaveModal = ref(false)
-let recordingBlob: Blob | null = null
+function onSheetTouchStart(e: TouchEvent) {
+  sheetStartY = e.touches[0].clientY
+}
+
+function onSheetTouchMove(e: TouchEvent) {
+  const delta = e.touches[0].clientY - sheetStartY
+  if (delta > 0) sheetDragY.value = delta
+}
+
+function onSheetTouchEnd() {
+  if (sheetDragY.value > 100) showBottomSheet.value = false
+  sheetDragY.value = 0
+}
 
 // アイコンをcanvasで描画してImageDataを生成
 const ICON_SIZE = 64
@@ -256,103 +411,28 @@ async function getIconImageData(icon: string): Promise<ImageData> {
   })
 }
 
-function startRecording() {
-  if (!map) return
-  const mapCanvas = map.getCanvas()
-  const { width: fw, height: fh } = frameSize.value
-  const dpr = window.devicePixelRatio || 1
-  const outW = Math.round(fw * dpr)
-  const outH = Math.round(fh * dpr)
-
-  // マップは全画面のまま、中央をフレームサイズでクロップした中間canvasに録画
-  const recCanvas = document.createElement('canvas')
-  recCanvas.width = outW
-  recCanvas.height = outH
-  const recCtx = recCanvas.getContext('2d')!
-
-  const copyFrame = () => {
-    const sx = Math.max(0, (mapCanvas.width - outW) / 2)
-    const sy = Math.max(0, (mapCanvas.height - outH) / 2)
-    recCtx.drawImage(mapCanvas, sx, sy, outW, outH, 0, 0, outW, outH)
-    recordingRafId = requestAnimationFrame(copyFrame)
-  }
-  recordingRafId = requestAnimationFrame(copyFrame)
-
-  const stream = recCanvas.captureStream(30)
-  const chunks: Blob[] = []
-  const mimeType = ['video/mp4', 'video/webm;codecs=h264', 'video/webm'].find(t => MediaRecorder.isTypeSupported(t)) ?? ''
-  const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {})
-
-  recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
-  recorder.onstop = () => {
-    if (chunks.length === 0) return
-    recordingBlob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' })
-    showSaveModal.value = true
-  }
-
-  recorder.start(1000)
-  mediaRecorder = recorder
-
-  if (mapLoaded) map.setLayoutProperty('anim-point-layer', 'visibility', 'visible')
-}
-
-function stopRecording() {
-  if (recordingRafId) {
-    cancelAnimationFrame(recordingRafId)
-    recordingRafId = null
-  }
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop()
-  }
-  mediaRecorder = null
-  if (map && mapLoaded) map.setLayoutProperty('anim-point-layer', 'visibility', 'none')
-}
-
-function saveRecording() {
-  if (!recordingBlob) return
-  const ext = recordingBlob.type.split('/')[1]?.split(';')[0] ?? 'webm'
-  const now = new Date()
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const name = `movepoint_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.${ext}`
-  const url = URL.createObjectURL(recordingBlob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  a.click()
-  URL.revokeObjectURL(url)
-  showSaveModal.value = false
-  recordingBlob = null
-}
-
-function discardRecording() {
-  showSaveModal.value = false
-  recordingBlob = null
-}
-
-async function enterRecording() {
-  isRecordingMode.value = true
-  stopAnimation()
-  store.isPlaying = false
-  store.isPaused = false
-  startRecording()
-  await nextTick()
-  store.play()
-}
-
-function exitRecording() {
-  isRecordingMode.value = false
-  store.stop()
-  stopRecording()
-  updateSubMarkerVisibility(false)
-}
-
 function onFileSelect(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
-  const url = URL.createObjectURL(file)
-  store.customIcons.push(url)
-  store.icon = url
-  showIconPicker.value = false
+  const img = new Image()
+  img.onload = () => {
+    const size = 128
+    const c = document.createElement('canvas')
+    c.width = size; c.height = size
+    const ctx = c.getContext('2d')!
+    const min = Math.min(img.width, img.height)
+    const sx = (img.width - min) / 2
+    const sy = (img.height - min) / 2
+    ctx.beginPath()
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
+    ctx.clip()
+    ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size)
+    if (store.icon.startsWith('blob:')) URL.revokeObjectURL(store.icon)
+    c.toBlob(blob => {
+      if (blob) store.icon = URL.createObjectURL(blob)
+    }, 'image/png')
+  }
+  img.src = URL.createObjectURL(file)
   ;(e.target as HTMLInputElement).value = ''
 }
 
@@ -360,6 +440,7 @@ function onFileSelect(e: Event) {
 let animationId: number | null = null
 let animMarker: maplibregl.Marker | null = null
 let animOffset = 0 // seconds traveled at 1x speed
+let currentAnimPos: [number, number] | null = null
 const BASE_DURATION = 10 // seconds at 1x speed
 
 function getAllCoords(): [number, number][] {
@@ -369,10 +450,12 @@ function getAllCoords(): [number, number][] {
 function createAnimMarkerEl() {
   const el = document.createElement('div')
   el.className = 'anim-marker'
+  el.style.fontSize = `${iconSize.value}px`
   if (store.icon.startsWith('blob:')) {
     const img = document.createElement('img')
     img.src = store.icon
-    img.className = 'icon-option-img'
+    img.className = 'anim-marker-img'
+    img.style.width = img.style.height = `${iconSize.value}px`
     el.appendChild(img)
   } else {
     el.textContent = store.icon
@@ -388,8 +471,7 @@ function startAnimation() {
   const coords = getAllCoords()
   if (coords.length < 2) return
 
-  // 録画中はHTMLマーカーを非表示（キャンバス上のシンボルのみ使用）
-  if (!isRecordingMode.value && !animMarker) {
+  if (!animMarker) {
     const startIdx = Math.floor((animOffset / BASE_DURATION) * (coords.length - 1))
     animMarker = new maplibregl.Marker({ element: createAnimMarkerEl() })
       .setLngLat(coords[Math.min(startIdx, coords.length - 1)])
@@ -413,14 +495,15 @@ function startAnimation() {
 
     const progress = Math.min(animOffset / BASE_DURATION, 1)
 
-    // 座標間を線形補間して滑らかに移動
     const exactIdx = progress * (coords.length - 1)
     const i0 = Math.floor(exactIdx)
     const i1 = Math.min(i0 + 1, coords.length - 1)
     const t = exactIdx - i0
     const pos = interpolate(coords[i0], coords[i1], t)
 
+    currentAnimPos = pos
     animMarker?.setLngLat(pos)
+    map!.jumpTo({ center: pos })
 
     if (mapLoaded) {
       const animSrc = map!.getSource('anim-point') as GeoJSONSource
@@ -438,15 +521,7 @@ function startAnimation() {
       })
     }
 
-    if (isRecordingMode.value) {
-      map!.jumpTo({ center: pos })
-    }
-
     if (progress >= 1) {
-      if (isRecordingMode.value) {
-        exitRecording()
-        return
-      }
       animOffset = 0
       lastTimestamp = null
     }
@@ -472,6 +547,7 @@ function stopAnimation() {
   animMarker?.remove()
   animMarker = null
   animOffset = 0
+  currentAnimPos = null
 
   if (map && mapLoaded) {
     const trailSrc = map.getSource('routes-trail') as GeoJSONSource
@@ -510,6 +586,7 @@ function createMarkerEl(order: number, type: 'main' | 'sub', label?: string) {
   if (label) {
     const labelEl = document.createElement('div')
     labelEl.className = 'marker-label'
+    labelEl.style.fontSize = `${labelSize.value}px`
     labelEl.textContent = label
     wrapper.appendChild(labelEl)
   }
@@ -579,17 +656,14 @@ function redrawMarkers() {
       setTimeout(() => { isDragging = false }, 0)
     })
 
-    // PC: クリックで削除
     let singleTapTimer: ReturnType<typeof setTimeout> | null = null
 
-    // PC: クリックで削除（タッチ後の合成clickは除外）
     circle.addEventListener('click', (e) => {
       e.stopPropagation()
       if (isDragging || isTouchDevice) return
       store.removeWaypoint(wp.id)
     })
 
-    // PC: 右クリックでタイプ切り替え
     circle.addEventListener('mousedown', (e) => {
       if (e.button === 2) {
         e.stopPropagation()
@@ -603,7 +677,6 @@ function redrawMarkers() {
       e.stopPropagation()
     })
 
-    // PC: 2秒ホバーでラベル入力
     circle.addEventListener('mouseenter', () => {
       hoverTimer = setTimeout(() => showLabelInput(wp.id), 2000)
     })
@@ -612,7 +685,6 @@ function redrawMarkers() {
       if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null }
     })
 
-    // モバイル: 長押し(600ms)でラベル入力
     circle.addEventListener('touchstart', (e) => {
       e.stopPropagation()
       longPressTimer = setTimeout(() => {
@@ -627,19 +699,17 @@ function redrawMarkers() {
 
     circle.addEventListener('touchend', (e) => {
       e.stopPropagation()
-      e.preventDefault() // 合成clickを抑制
+      e.preventDefault()
 
-      if (!longPressTimer) return // 長押し完了済み
+      if (!longPressTimer) return
       cancelLongPress()
 
       const now = Date.now()
       if (now - lastTapTime < 300) {
-        // ダブルタップ → タイプ切り替え
         if (singleTapTimer) { clearTimeout(singleTapTimer); singleTapTimer = null }
         store.toggleType(wp.id)
         lastTapTime = 0
       } else {
-        // シングルタップ仮判定 → 300ms後に2回目が来なければ削除
         lastTapTime = now
         const capturedTime = now
         singleTapTimer = setTimeout(() => {
@@ -680,9 +750,8 @@ onMounted(() => {
     zoom: 14,
   } as unknown as maplibregl.MapOptions)
 
-  map.addControl(new maplibregl.NavigationControl(), 'top-right')
+  map.addControl(new maplibregl.NavigationControl(), 'top-left')
   map.on('click', (e) => {
-    if (isRecordingMode.value) return
     store.addWaypoint(e.lngLat.lat, e.lngLat.lng)
   })
 
@@ -754,6 +823,16 @@ onMounted(() => {
 
 watch(waypoints, redrawMarkers, { deep: true })
 watch(routes, updateRouteSource, { deep: true })
+watch(labelSize, () => { if (mapLoaded) redrawMarkers() })
+
+watch(iconSize, (size) => {
+  if (!animMarker) return
+  const el = animMarker.getElement()
+  el.style.fontSize = `${size}px`
+  const img = el.querySelector('img') as HTMLImageElement | null
+  if (img) img.style.width = img.style.height = `${size}px`
+})
+
 watch(() => store.icon, async (newIcon) => {
   if (!map || !mapLoaded) return
   const data = await getIconImageData(newIcon)
@@ -770,13 +849,7 @@ watch([isPlaying, isPaused], ([playing, paused]) => {
   updateSubMarkerVisibility(playing || paused)
 })
 
-const onKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape' && isRecordingMode.value) exitRecording()
-}
-
-onMounted(() => document.addEventListener('keydown', onKeydown))
 onUnmounted(() => {
-  document.removeEventListener('keydown', onKeydown)
   map?.remove()
 })
 </script>
@@ -788,144 +861,260 @@ onUnmounted(() => {
   position: relative;
 }
 
-.playback-overlay {
+/* PC 右サイドパネル */
+.pc-panel {
   position: absolute;
-  bottom: 28px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 20vw;
+  min-width: 400px;
+  max-width: 500px;
+  background: rgba(15, 15, 15, 0.82);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
   display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(15, 15, 15, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 8px 14px;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
-  white-space: nowrap;
+  flex-direction: row;
+  z-index: 10;
+  transition: width 0.22s ease, min-width 0.22s ease;
 }
 
-.overlay-btn {
+.pc-panel--closed {
+  width: 32px !important;
+  min-width: 32px !important;
+}
+
+.pc-panel-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: none;
+  min-width: 0;
+}
+
+.pc-panel-content::-webkit-scrollbar { display: none; }
+
+.panel-toggle-btn {
+  width: 32px;
+  flex-shrink: 0;
   background: none;
   border: none;
-  color: white;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
   font-size: 16px;
   cursor: pointer;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+  writing-mode: vertical-rl;
+  letter-spacing: 0;
+}
+
+.panel-toggle-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.panel-section {
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.panel-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.section-label {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+/* モードトグル */
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mode-icon {
+  font-size: 20px;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.mode-icon.active { opacity: 1; }
+
+.toggle-track {
+  flex: 1;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.toggle-track:hover { background: rgba(255, 255, 255, 0.2); }
+
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  height: 22px;
+  background: white;
+  border-radius: 11px;
+  transition: left 0.2s ease;
+}
+
+.toggle-thumb.right { left: calc(50%); }
+
+/* スライダー */
+.panel-slider {
+  width: 100%;
+  accent-color: white;
+  cursor: pointer;
+  display: block;
+}
+
+/* マップスタイル */
+.tile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.tile-btn {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  padding: 6px 4px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.tile-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: white;
+}
+
+.tile-btn.active {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: white;
+}
+
+/* コントロールボタン */
+.ctrl-btn {
+  flex: 1;
+  min-width: 42px;
+  height: 52px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: white;
+  font-size: 22px;
+  border-radius: 12px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background 0.15s;
-  flex-shrink: 0;
 }
 
-.overlay-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+.ctrl-btn:hover { background: rgba(255, 255, 255, 0.16); }
+.ctrl-btn:active { background: rgba(255, 255, 255, 0.24); }
+
+.ctrl-btn--play {
+  background: #0d6efd;
+  border-color: transparent;
 }
 
-.overlay-btn:active {
-  background: rgba(255, 255, 255, 0.25);
-}
+.ctrl-btn--play:hover { background: #0b5ed7; }
 
-.overlay-btn:disabled,
-.ratio-btn:disabled {
+.ctrl-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
   pointer-events: none;
 }
 
-.overlay-label {
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 11px;
-  white-space: nowrap;
-  letter-spacing: 0.02em;
+.ctrl-btn--text {
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.overlay-slider {
-  width: 100px;
-  accent-color: white;
-  cursor: pointer;
-}
 
-.overlay-divider {
-  width: 1px;
-  height: 18px;
-  background: rgba(255, 255, 255, 0.15);
-  flex-shrink: 0;
-  margin: 0 2px;
-}
-
-.overlay-group {
+/* アイコン */
+.icon-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
-.icon-picker-wrap {
-  position: relative;
-}
-
-/* 撮影モード */
-.phone-frame {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  border-radius: 20px;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
-  z-index: 15;
-  pointer-events: none;
-}
-
-.ratio-btn {
-  background: none;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 10px;
-  padding: 3px 7px;
-  border-radius: 6px;
-  cursor: pointer;
-  line-height: 1;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-
-.ratio-btn:hover {
-  border-color: rgba(255, 255, 255, 0.5);
-  color: white;
-}
-
-.ratio-btn.active {
-  border-color: white;
-  color: white;
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.record-exit-btn {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 20;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  font-size: 14px;
-  cursor: pointer;
+.icon-preview {
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(8px);
+  flex-shrink: 0;
 }
 
-.record-exit-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+.icon-preview-emoji { font-size: 26px; }
+
+.icon-preview-img {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.icon-upload-btn {
+  flex: 1;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.icon-upload-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+}
+
+.icon-reset-btn {
+  width: 32px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.icon-reset-btn:hover {
+  background: rgba(255, 100, 100, 0.2);
+  color: white;
 }
 
 .modal-backdrop {
@@ -939,52 +1128,71 @@ onUnmounted(() => {
   backdrop-filter: blur(4px);
 }
 
-.modal-box {
-  background: rgba(20, 20, 20, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  padding: 28px 32px;
+.image-modal-backdrop {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.image-modal-box {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}
-
-.modal-title {
-  color: white;
-  font-size: 16px;
-  margin: 0;
-}
-
-.modal-actions {
-  display: flex;
   gap: 12px;
+  max-height: 92vh;
+  position: relative;
 }
 
-.modal-btn {
-  border: none;
-  border-radius: 8px;
-  padding: 8px 28px;
-  font-size: 14px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: opacity 0.15s;
-}
-
-.modal-btn:hover {
-  opacity: 0.85;
-}
-
-.modal-btn--primary {
-  background: #0d6efd;
-  color: white;
-}
-
-.modal-btn--secondary {
+.image-modal-close {
+  position: absolute;
+  top: -8px;
+  right: -8px;
   background: rgba(255, 255, 255, 0.15);
+  border: none;
   color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
 }
+
+.image-modal-preview {
+  max-height: 75vh;
+  max-width: 90vw;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.image-modal-hint {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  margin: 0;
+  text-align: center;
+}
+
+.image-modal-hint {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  margin: 0;
+  text-align: center;
+}
+
+.image-modal-download {
+  color: white;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 6px 20px;
+  border-radius: 20px;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.image-modal-download:hover { background: rgba(255, 255, 255, 0.25); }
 
 /* PC/SP 出し分け */
 .sp-only { display: none; }
@@ -992,192 +1200,283 @@ onUnmounted(() => {
 @media (max-width: 640px) {
   .pc-only { display: none !important; }
   .sp-only { display: flex; }
-  .phone-frame { display: none; }
 }
 
-/* モバイルオーバーレイ */
-.mobile-overlay {
+/* ===== モバイル Stories スタイル ===== */
+
+/* モードピル */
+.mob-mode-pill {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: 24px;
+  cursor: pointer;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.mob-mode-pill:active { background: rgba(0,0,0,0.75); }
+
+.mob-mode-text { font-size: 13px; }
+
+/* 設定ボタン */
+.mob-settings-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 15;
+  width: 42px;
+  height: 42px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  color: white;
+  font-size: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.mob-settings-btn:active { background: rgba(0,0,0,0.75); }
+
+/* 停止 FAB */
+.mob-stop-fab {
+  position: absolute;
+  bottom: 120px;
+  right: 20px;
+  z-index: 15;
+  width: 52px;
+  height: 52px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255,255,255,0.25);
+  backdrop-filter: blur(10px);
+  color: white;
+  font-size: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 下部アクションバー */
+.mob-action-bar {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 10;
-  flex-direction: column;
-  align-items: stretch;
+  z-index: 15;
+  padding: 12px 24px max(16px, env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
+  align-items: center;
+  justify-content: space-between;
 }
 
-.mobile-panel {
-  background: rgba(15, 15, 15, 0.85);
-  border-top: 1px solid rgba(255,255,255,0.08);
-  backdrop-filter: blur(12px);
-  padding: 14px 16px;
-}
-
-.mobile-panel-content {
+.mob-play-btn {
+  width: 72px;
+  height: 72px;
+  background: rgba(255,255,255,0.92);
+  border: none;
+  color: #111;
+  font-size: 32px;
+  border-radius: 50%;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  transition: transform 0.1s, background 0.15s;
+  flex-shrink: 0;
+}
+.mob-play-btn:active { transform: scale(0.93); }
+.mob-play-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
-.mobile-panel-content.icon-grid {
-  gap: 6px;
+.mob-side-btn {
+  width: 48px;
+  height: 48px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.2);
+  backdrop-filter: blur(8px);
+  color: white;
+  font-size: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.mob-side-btn:active { background: rgba(255,255,255,0.2); }
+.mob-side-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.mob-side-btn--text { font-size: 13px; font-weight: 600; width: auto; padding: 0 14px; border-radius: 24px; }
+
+/* ボトムシート backdrop */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(2px);
 }
 
-.panel-label {
+/* ボトムシート */
+.bottom-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 25;
+  background: rgba(18, 18, 18, 0.96);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(20px);
+  flex-direction: column;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  display: flex;
+}
+
+.sheet-handle-bar {
+  width: 36px;
+  height: 4px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 2px;
+  margin: 12px auto 6px;
+  flex-shrink: 0;
+}
+
+.sheet-body {
+  overflow-y: auto;
+  padding: 8px 0;
+  flex: 1;
+  scrollbar-width: none;
+}
+.sheet-body::-webkit-scrollbar { display: none; }
+
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.sheet-row:last-child { border-bottom: none; }
+
+.sheet-label {
   color: rgba(255,255,255,0.5);
   font-size: 12px;
   white-space: nowrap;
+  min-width: 90px;
+  flex-shrink: 0;
 }
 
-.panel-slider {
+.sheet-slider {
   flex: 1;
   accent-color: white;
   cursor: pointer;
 }
 
-.panel-chip {
-  background: none;
-  border: 1px solid rgba(255,255,255,0.25);
-  color: rgba(255,255,255,0.7);
-  font-size: 13px;
-  padding: 6px 14px;
-  border-radius: 20px;
+.sheet-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.sheet-chip {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.65);
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 16px;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
 }
-
-.panel-chip.active {
-  border-color: white;
+.sheet-chip.active,
+.sheet-chip:active {
+  background: rgba(255,255,255,0.2);
+  border-color: rgba(255,255,255,0.4);
   color: white;
-  background: rgba(255,255,255,0.15);
+}
+.sheet-chip--reset {
+  color: rgba(255,100,100,0.8);
+  border-color: rgba(255,100,100,0.3);
 }
 
-.panel-icon-btn {
-  background: none;
-  border: 2px solid transparent;
-  border-radius: 8px;
-  font-size: 26px;
-  cursor: pointer;
-  padding: 4px;
-  line-height: 1;
-  color: white;
-  transition: border-color 0.15s;
-}
-
-.panel-icon-btn.active {
-  border-color: white;
-}
-
-.mobile-bar {
+.sheet-icon-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  background: rgba(15, 15, 15, 0.82);
-  border-top: 1px solid rgba(255,255,255,0.08);
-  backdrop-filter: blur(12px);
-  padding: 10px 12px;
-  padding-bottom: max(10px, env(safe-area-inset-bottom));
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  gap: 10px;
+  flex: 1;
 }
 
-.mobile-bar::-webkit-scrollbar {
-  display: none;
+/* モバイル全画面プレビュー */
+.mob-image-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: black;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
-.mob-btn {
-  background: none;
-  border: none;
+.mob-image-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.mob-image-close {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  right: 16px;
+  z-index: 51;
+  width: 36px;
+  height: 36px;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid rgba(255,255,255,0.2);
   color: white;
-  font-size: 20px;
+  font-size: 16px;
+  border-radius: 50%;
   cursor: pointer;
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  transition: background 0.15s;
 }
 
-.mob-btn:active,
-.mob-btn.active {
-  background: rgba(255,255,255,0.15);
-}
-
-.mob-btn--label {
-  font-size: 12px;
-  font-weight: 600;
-  width: auto;
-  padding: 0 8px;
-  color: rgba(255,255,255,0.7);
-}
-
-.mob-btn--label.active {
-  color: white;
-}
-
-.mob-divider {
-  width: 1px;
-  height: 20px;
-  background: rgba(255,255,255,0.15);
-  flex-shrink: 0;
-  margin: 0 2px;
-}
-
-.icon-btn {
-  font-size: 22px;
-  padding: 0 4px;
-}
-
-.icon-picker-popup {
+.mob-image-hint {
   position: absolute;
-  bottom: calc(100% + 10px);
+  bottom: max(24px, env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(4px);
-  border-radius: 10px;
-  padding: 8px;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 4px;
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
   white-space: nowrap;
+  pointer-events: none;
 }
 
-.icon-option {
-  background: none;
-  border: 2px solid transparent;
-  border-radius: 6px;
-  font-size: 22px;
-  cursor: pointer;
-  padding: 4px;
-  line-height: 1;
-  transition: border-color 0.15s;
-}
+/* Transition アニメーション */
+.mob-fade-enter-active, .mob-fade-leave-active { transition: opacity 0.2s; }
+.mob-fade-enter-from, .mob-fade-leave-to { opacity: 0; }
 
-.icon-option:hover {
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-.icon-option.active {
-  border-color: white;
-}
-
-.icon-option-img {
-  width: 22px;
-  height: 22px;
-  object-fit: cover;
-  border-radius: 50%;
-}
-
-.icon-add {
-  color: white;
-  font-size: 18px;
-}
+.mob-slide-enter-active, .mob-slide-leave-active { transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); }
+.mob-slide-enter-from, .mob-slide-leave-to { transform: translateY(100%); }
 
 </style>
 
@@ -1239,12 +1538,18 @@ onUnmounted(() => {
 }
 
 .anim-marker {
-  font-size: 22px;
   line-height: 1;
   cursor: default;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.anim-marker-img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 50%;
 }
 </style>
