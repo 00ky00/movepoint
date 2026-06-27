@@ -42,10 +42,6 @@
             @input="emit('update:labelSize', Number(($event.target as HTMLInputElement).value))" class="sheet-slider" />
         </div>
         <div class="sheet-row">
-          <span class="sheet-label">雨雲レーダー</span>
-          <button class="sheet-chip" :class="{ active: showRain }" @click="emit('toggleRain')">🌧 {{ showRain ? 'ON' : 'OFF' }}</button>
-        </div>
-        <div class="sheet-row">
           <span class="sheet-label">アイコン画像</span>
           <div class="sheet-icon-row">
             <div class="icon-preview">
