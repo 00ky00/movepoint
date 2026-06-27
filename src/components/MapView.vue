@@ -612,7 +612,12 @@ onUnmounted(() => {
 }
 
 @media (max-width: 640px) {
-  .credit-label { display: none; }
+  .credit-label {
+    bottom: auto;
+    left: auto;
+    top: 16px;
+    right: 16px;
+  }
 }
 
 /* ヘルプボタン */
