@@ -42,6 +42,10 @@
             @input="emit('update:labelSize', Number(($event.target as HTMLInputElement).value))" class="sheet-slider" />
         </div>
         <div class="sheet-row">
+          <span class="sheet-label">雨雲レーダー</span>
+          <button class="sheet-chip" :class="{ active: showRain }" @click="emit('toggleRain')">🌧 {{ showRain ? 'ON' : 'OFF' }}</button>
+        </div>
+        <div class="sheet-row">
           <span class="sheet-label">アイコン画像</span>
           <div class="sheet-icon-row">
             <div class="icon-preview">
@@ -76,6 +80,7 @@ const props = defineProps<{
   mapOpacity: number
   iconSize: number
   labelSize: number
+  showRain: boolean
 }>()
 
 const emit = defineEmits<{
@@ -85,6 +90,7 @@ const emit = defineEmits<{
   (e: 'selectFile'): void
   (e: 'update:iconSize', val: number): void
   (e: 'update:labelSize', val: number): void
+  (e: 'toggleRain'): void
 }>()
 
 // suppress unused props lint — values are used in template

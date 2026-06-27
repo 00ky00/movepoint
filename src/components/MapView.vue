@@ -7,6 +7,7 @@
       :mapOpacity="mapOpacity"
       :iconSize="iconSize"
       :labelSize="labelSize"
+      :showRain="showRain"
       @switchTileStyle="switchTileStyle"
       @updateMapOpacity="updateMapOpacity"
       @capture="captureImage"
@@ -14,6 +15,7 @@
       @openPointSheet="openPointSheet"
       @update:iconSize="iconSize = $event"
       @update:labelSize="labelSize = $event"
+      @toggleRain="toggleRain"
     />
 
     <!-- モバイル UI -->
@@ -46,11 +48,13 @@
       :mapOpacity="mapOpacity"
       :iconSize="iconSize"
       :labelSize="labelSize"
+      :showRain="showRain"
       @switchTileStyle="switchTileStyle"
       @updateMapOpacity="updateMapOpacity"
       @selectFile="fileInputRef?.click()"
       @update:iconSize="iconSize = $event"
       @update:labelSize="labelSize = $event"
+      @toggleRain="toggleRain"
     />
 
     <!-- ヘルプボタン -->
@@ -112,6 +116,38 @@ const mapOpacity = ref(1)
 const iconSize = ref(40)
 const labelSize = ref(11)
 const showHelpModal = ref(true)
+
+// 雨雲レーダー
+const showRain = ref(false)
+let rainTimestamp: number | null = null
+
+async function fetchRainTimestamp() {
+  try {
+    const res = await fetch('https://api.rainviewer.com/public/weather-maps.json')
+    const data = await res.json()
+    const frames = data.radar?.past
+    if (frames?.length) rainTimestamp = frames[frames.length - 1].time
+  } catch { /* 取得失敗時は無効のまま */ }
+}
+
+function toggleRain() {
+  if (!map || !mapLoaded) return
+  showRain.value = !showRain.value
+  if (showRain.value && rainTimestamp) {
+    if (!map.getSource('rain')) {
+      map.addSource('rain', {
+        type: 'raster',
+        tiles: [`https://tilecache.rainviewer.com/v2/radar/${rainTimestamp}/256/{z}/{x}/{y}/2/1_1.png`],
+        tileSize: 256,
+        attribution: 'RainViewer',
+      })
+      map.addLayer({ id: 'rain', type: 'raster', source: 'rain', paint: { 'raster-opacity': 0.6 } })
+    }
+  } else {
+    if (map.getLayer('rain')) map.removeLayer('rain')
+    if (map.getSource('rain')) map.removeSource('rain')
+  }
+}
 const showBottomSheet = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
@@ -420,6 +456,8 @@ function redrawMarkers() {
 onMounted(() => {
   if (!mapContainer.value) return
 
+  fetchRainTimestamp()
+
   map = new maplibregl.Map({
     container: mapContainer.value,
     preserveDrawingBuffer: true,
@@ -443,6 +481,12 @@ onMounted(() => {
     const id = await store.addWaypoint(e.lngLat.lat, e.lngLat.lng)
     await nextTick()
     openPointSheet(id)
+  })
+
+  map.on('movestart', (e) => {
+    if (e.originalEvent && (store.isPlaying || store.isPaused)) {
+      store.stop()
+    }
   })
 
   map.on('load', () => {

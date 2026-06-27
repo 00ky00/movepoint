@@ -11,8 +11,9 @@ export function useAnimation(
 ) {
   const store = useMapStore()
 
-  let animationId: number | null = null
   let animOffset = 0
+  let animLastTime = 0
+  let animStepFn: (() => void) | null = null
   const currentAnimPos = ref<[number, number] | null>(null)
 
   function getAllCoords(): [number, number][] {
@@ -39,73 +40,63 @@ export function useAnimation(
       map.setLayoutProperty('routes-trail', 'visibility', 'visible')
     }
 
-    let lastTimestamp: number | null = null
+    animLastTime = performance.now()
 
-    const step = (timestamp: number) => {
+    const step = () => {
       if (!store.isPlaying) return
 
-      if (lastTimestamp !== null) {
-        animOffset += ((timestamp - lastTimestamp) / 1000) * store.speed
-      }
-      lastTimestamp = timestamp
+      const now = performance.now()
+      animOffset += ((now - animLastTime) / 1000) * store.speed
+      animLastTime = now
 
       const progress = Math.min(animOffset / BASE_DURATION, 1)
-
       const exactIdx = progress * (coords.length - 1)
       const i0 = Math.floor(exactIdx)
       const i1 = Math.min(i0 + 1, coords.length - 1)
-      const t = exactIdx - i0
-      const pos = interpolate(coords[i0], coords[i1], t)
+      const pos = interpolate(coords[i0], coords[i1], exactIdx - i0)
 
       currentAnimPos.value = pos
-      map.jumpTo({ center: pos })
 
       if (getMapLoaded()) {
-        const animSrc = map.getSource('anim-point') as GeoJSONSource
-        animSrc?.setData({
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: pos },
-          properties: {},
-        })
-
         const trailSrc = map.getSource('routes-trail') as GeoJSONSource
         trailSrc?.setData({
           type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: [...coords.slice(0, i0 + 1), pos],
-          },
+          geometry: { type: 'LineString', coordinates: [...coords.slice(0, i0 + 1), pos] },
           properties: {},
         })
       }
 
       if (progress >= 1) {
         animOffset = 0
-        lastTimestamp = null
+        animLastTime = performance.now()
       }
 
-      animationId = requestAnimationFrame(step)
+      // setCenter はMapLibreの次フレームをスケジュールし、render イベントを再度発火させる
+      map.setCenter(pos)
     }
 
-    animationId = requestAnimationFrame(step)
+    animStepFn = step
+    map.on('render', step)
+    map.triggerRepaint()
   }
 
   function pauseAnimation() {
-    if (animationId) {
-      cancelAnimationFrame(animationId)
-      animationId = null
+    const map = getMap()
+    if (map && animStepFn) {
+      map.off('render', animStepFn)
+      animStepFn = null
     }
   }
 
   function stopAnimation() {
-    if (animationId) {
-      cancelAnimationFrame(animationId)
-      animationId = null
+    const map = getMap()
+    if (map && animStepFn) {
+      map.off('render', animStepFn)
+      animStepFn = null
     }
     animOffset = 0
     currentAnimPos.value = null
 
-    const map = getMap()
     if (map && getMapLoaded()) {
       const trailSrc = map.getSource('routes-trail') as GeoJSONSource
       trailSrc?.setData({

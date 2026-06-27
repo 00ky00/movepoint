@@ -34,6 +34,12 @@
         </div>
       </div>
 
+      <!-- 雨雲レーダー -->
+      <div class="panel-section">
+        <div class="section-label">オーバーレイ</div>
+        <button class="tile-btn" :class="{ active: showRain }" @click="emit('toggleRain')">🌧 雨雲レーダー</button>
+      </div>
+
       <!-- 透過 -->
       <div class="panel-section">
         <div class="section-label">透過</div>
@@ -113,6 +119,7 @@ const props = defineProps<{
   mapOpacity: number
   iconSize: number
   labelSize: number
+  showRain: boolean
 }>()
 
 const emit = defineEmits<{
@@ -123,6 +130,7 @@ const emit = defineEmits<{
   (e: 'openPointSheet', id: string): void
   (e: 'update:iconSize', val: number): void
   (e: 'update:labelSize', val: number): void
+  (e: 'toggleRain'): void
 }>()
 
 // suppress unused props lint — values are used in template
