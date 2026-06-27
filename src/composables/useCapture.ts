@@ -182,19 +182,28 @@ export function useCapture(
       }
     }
 
-    // ルートスナップ ロゴ
-    const logoSize = Math.round(outW * 0.045)
-    ctx.font = `bold ${logoSize}px 'Noto Sans JP', 'Hiragino Kaku Gothic Pro', sans-serif`
-    ctx.textAlign = 'right'
-    ctx.textBaseline = 'bottom'
-    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    // ルートスナップ ロゴ（左下・モダン）
+    const logoSize = Math.round(outW * 0.042)
     const logoText = 'ルートスナップ'
-    const tm = ctx.measureText(logoText)
-    const lx = outW - 28
-    const ly = outH - 28
-    ctx.fillRect(lx - tm.width - 12, ly - logoSize - 6, tm.width + 24, logoSize + 12)
+    ctx.font = `bold ${logoSize}px 'Hiragino Kaku Gothic Pro', 'Noto Sans JP', sans-serif`
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'bottom'
+    const lx = 52
+    const ly = outH - 52
+    // ドロップシャドウ
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'
+    ctx.shadowBlur = 18
+    ctx.shadowOffsetX = 0
+    ctx.shadowOffsetY = 4
     ctx.fillStyle = 'white'
     ctx.fillText(logoText, lx, ly)
+    // アクセントライン
+    ctx.shadowColor = 'transparent'
+    ctx.shadowBlur = 0
+    ctx.shadowOffsetY = 0
+    const tm2 = ctx.measureText(logoText)
+    ctx.fillStyle = '#0d6efd'
+    ctx.fillRect(lx, ly + 6, tm2.width, Math.round(outW * 0.006))
 
     capturedImageUrl.value = outCanvas.toDataURL('image/png')
     isCapturing.value = false

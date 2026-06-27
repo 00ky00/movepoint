@@ -600,10 +600,15 @@ onUnmounted(() => {
   bottom: 10px;
   left: 10px;
   z-index: 10;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.75);
   font-size: 11px;
+  font-weight: 500;
   pointer-events: none;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  padding: 3px 8px;
+  border-radius: 6px;
 }
 
 @media (max-width: 640px) {
