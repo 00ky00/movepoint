@@ -483,6 +483,10 @@ onMounted(() => {
   } as unknown as maplibregl.MapOptions)
 
   map.on('click', async (e) => {
+    if (store.isPlaying || store.isPaused) {
+      store.stop()
+      return
+    }
     const id = await store.addWaypoint(e.lngLat.lat, e.lngLat.lng)
     await nextTick()
     openPointSheet(id)
