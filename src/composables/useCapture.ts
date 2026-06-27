@@ -182,6 +182,20 @@ export function useCapture(
       }
     }
 
+    // ルートスナップ ロゴ
+    const logoSize = Math.round(outW * 0.045)
+    ctx.font = `bold ${logoSize}px 'Noto Sans JP', 'Hiragino Kaku Gothic Pro', sans-serif`
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'bottom'
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    const logoText = 'ルートスナップ'
+    const tm = ctx.measureText(logoText)
+    const lx = outW - 28
+    const ly = outH - 28
+    ctx.fillRect(lx - tm.width - 12, ly - logoSize - 6, tm.width + 24, logoSize + 12)
+    ctx.fillStyle = 'white'
+    ctx.fillText(logoText, lx, ly)
+
     capturedImageUrl.value = outCanvas.toDataURL('image/png')
     isCapturing.value = false
     showImageModal.value = true

@@ -57,6 +57,9 @@
       @toggleRain="toggleRain"
     />
 
+    <!-- クレジット (PC only) -->
+    <div class="credit-label">by kouta</div>
+
     <!-- ヘルプボタン -->
     <button class="help-btn" @click="showHelpModal = true">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -589,6 +592,22 @@ onUnmounted(() => {
   flex: 1;
   height: 100%;
   position: relative;
+}
+
+/* クレジット */
+.credit-label {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 10;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  pointer-events: none;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 640px) {
+  .credit-label { display: none; }
 }
 
 /* ヘルプボタン */
