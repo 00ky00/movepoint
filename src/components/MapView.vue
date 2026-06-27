@@ -139,6 +139,8 @@ function toggleRain() {
         type: 'raster',
         tiles: [`https://tilecache.rainviewer.com/v2/radar/${rainTimestamp}/256/{z}/{x}/{y}/2/1_1.png`],
         tileSize: 256,
+        minzoom: 0,
+        maxzoom: 12,
         attribution: 'RainViewer',
       })
       map.addLayer({ id: 'rain', type: 'raster', source: 'rain', paint: { 'raster-opacity': 0.6 } })
