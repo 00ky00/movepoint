@@ -40,7 +40,12 @@
         <rect x="15" y="3" width="7" height="20" rx="1.5"/>
       </svg>
     </button>
-    <button class="mob-side-btn mob-side-btn--text" :disabled="!store.isPaused" @click="emit('capture')">保存</button>
+    <button class="mob-side-btn" :disabled="!store.isPaused" @click="emit('capture')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+    </button>
   </div>
 </template>
 
