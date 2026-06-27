@@ -119,25 +119,28 @@ const showHelpModal = ref(true)
 
 // 雨雲レーダー
 const showRain = ref(false)
-let rainTimestamp: number | null = null
+let rainTilePath: string | null = null
 
 async function fetchRainTimestamp() {
   try {
     const res = await fetch('https://api.rainviewer.com/public/weather-maps.json')
     const data = await res.json()
     const frames = data.radar?.past
-    if (frames?.length) rainTimestamp = frames[frames.length - 1].time
+    if (frames?.length) {
+      const last = frames[frames.length - 1]
+      rainTilePath = `${data.host}${last.path}/256/{z}/{x}/{y}/2/1_1.png`
+    }
   } catch { /* 取得失敗時は無効のまま */ }
 }
 
 function toggleRain() {
   if (!map || !mapLoaded) return
   showRain.value = !showRain.value
-  if (showRain.value && rainTimestamp) {
+  if (showRain.value && rainTilePath) {
     if (!map.getSource('rain')) {
       map.addSource('rain', {
         type: 'raster',
-        tiles: [`https://tilecache.rainviewer.com/v2/radar/${rainTimestamp}/256/{z}/{x}/{y}/2/1_1.png`],
+        tiles: [rainTilePath],
         tileSize: 256,
         minzoom: 0,
         maxzoom: 12,
