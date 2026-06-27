@@ -84,16 +84,29 @@
     <!-- モードピル -->
     <button class="mob-mode-pill sp-only"
       @click="store.setRouteMode(store.routeMode === 'foot' ? 'driving' : 'foot')">
-      <span>{{ store.routeMode === 'foot' ? '🚶' : '🚗' }}</span>
       <span class="mob-mode-text">{{ store.routeMode === 'foot' ? '歩行' : 'ドライブ' }}</span>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="opacity:0.6;flex-shrink:0">
+        <path d="M3 5V8.5L1.5 7 0 8.5 3 11.5 6 8.5 4.5 7 3 8.5V5H3z"/>
+        <path d="M9 7V3.5L10.5 5 12 3.5 9 0.5 6 3.5 7.5 5 9 3.5V7H9z"/>
+      </svg>
     </button>
 
     <!-- 設定ボタン -->
-    <button class="mob-settings-btn sp-only" @click="showBottomSheet = true">⚙</button>
+    <button class="mob-settings-btn sp-only" @click="showBottomSheet = true">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+        <rect x="2" y="4" width="16" height="2" rx="1"/>
+        <rect x="2" y="9" width="16" height="2" rx="1"/>
+        <rect x="2" y="14" width="16" height="2" rx="1"/>
+      </svg>
+    </button>
 
     <!-- 停止FAB（再生/一時停止中のみ） -->
     <Transition name="mob-fade">
-      <button v-if="store.isPlaying || store.isPaused" class="mob-stop-fab sp-only" @click="store.stop()">⏹</button>
+      <button v-if="store.isPlaying || store.isPaused" class="mob-stop-fab sp-only" @click="store.stop()">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+          <rect x="2" y="2" width="14" height="14" rx="2"/>
+        </svg>
+      </button>
     </Transition>
 
     <!-- 下部アクションバー -->
@@ -101,10 +114,25 @@
       <button class="mob-side-btn mob-side-btn--text" @click="store.reset()">リセット</button>
       <button class="mob-play-btn" :disabled="!store.canPlay"
         @click="store.isPlaying ? store.pause() : store.play()">
-        {{ store.isPlaying ? '⏸' : '▶' }}
+        <svg v-if="!store.isPlaying" width="26" height="26" viewBox="0 0 26 26" fill="currentColor">
+          <polygon points="6,3 23,13 6,23"/>
+        </svg>
+        <svg v-else width="26" height="26" viewBox="0 0 26 26" fill="currentColor">
+          <rect x="4" y="3" width="7" height="20" rx="1.5"/>
+          <rect x="15" y="3" width="7" height="20" rx="1.5"/>
+        </svg>
       </button>
       <button class="mob-side-btn mob-side-btn--text" :disabled="!store.isPaused" @click="captureImage">保存</button>
     </div>
+
+    <!-- アニメーションアイコン（マップ中央固定） -->
+    <Transition name="mob-fade">
+      <div v-if="store.isPlaying || store.isPaused" class="anim-icon-center">
+        <img v-if="store.icon.startsWith('blob:')" :src="store.icon"
+          :style="`width:${iconSize}px;height:${iconSize}px`" class="anim-icon-img" />
+        <span v-else :style="`font-size:${iconSize}px;line-height:1`">{{ store.icon }}</span>
+      </div>
+    </Transition>
 
     <!-- ボトムシート backdrop -->
     <Transition name="mob-fade">
@@ -395,21 +423,6 @@ function renderIconToImageData(icon: string): ImageData {
   return ctx.getImageData(0, 0, ICON_SIZE, ICON_SIZE)
 }
 
-async function getIconImageData(icon: string): Promise<ImageData> {
-  if (!icon.startsWith('blob:')) return renderIconToImageData(icon)
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.onload = () => {
-      const c = document.createElement('canvas')
-      c.width = ICON_SIZE
-      c.height = ICON_SIZE
-      const ctx = c.getContext('2d')!
-      ctx.drawImage(img, 0, 0, ICON_SIZE, ICON_SIZE)
-      resolve(ctx.getImageData(0, 0, ICON_SIZE, ICON_SIZE))
-    }
-    img.src = icon
-  })
-}
 
 function onFileSelect(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
@@ -438,29 +451,12 @@ function onFileSelect(e: Event) {
 
 // Animation
 let animationId: number | null = null
-let animMarker: maplibregl.Marker | null = null
-let animOffset = 0 // seconds traveled at 1x speed
+let animOffset = 0
 let currentAnimPos: [number, number] | null = null
-const BASE_DURATION = 10 // seconds at 1x speed
+const BASE_DURATION = 10
 
 function getAllCoords(): [number, number][] {
   return store.routes.flat()
-}
-
-function createAnimMarkerEl() {
-  const el = document.createElement('div')
-  el.className = 'anim-marker'
-  el.style.fontSize = `${iconSize.value}px`
-  if (store.icon.startsWith('blob:')) {
-    const img = document.createElement('img')
-    img.src = store.icon
-    img.className = 'anim-marker-img'
-    img.style.width = img.style.height = `${iconSize.value}px`
-    el.appendChild(img)
-  } else {
-    el.textContent = store.icon
-  }
-  return el
 }
 
 function interpolate(a: [number, number], b: [number, number], t: number): [number, number] {
@@ -470,13 +466,6 @@ function interpolate(a: [number, number], b: [number, number], t: number): [numb
 function startAnimation() {
   const coords = getAllCoords()
   if (coords.length < 2) return
-
-  if (!animMarker) {
-    const startIdx = Math.floor((animOffset / BASE_DURATION) * (coords.length - 1))
-    animMarker = new maplibregl.Marker({ element: createAnimMarkerEl() })
-      .setLngLat(coords[Math.min(startIdx, coords.length - 1)])
-      .addTo(map!)
-  }
 
   if (mapLoaded) {
     map!.setPaintProperty('routes', 'line-opacity', 0.2)
@@ -502,7 +491,6 @@ function startAnimation() {
     const pos = interpolate(coords[i0], coords[i1], t)
 
     currentAnimPos = pos
-    animMarker?.setLngLat(pos)
     map!.jumpTo({ center: pos })
 
     if (mapLoaded) {
@@ -544,8 +532,6 @@ function stopAnimation() {
     cancelAnimationFrame(animationId)
     animationId = null
   }
-  animMarker?.remove()
-  animMarker = null
   animOffset = 0
   currentAnimPos = null
 
@@ -625,11 +611,10 @@ function showLabelInput(id: string) {
   input.addEventListener('blur', save)
 }
 
-function updateSubMarkerVisibility(hidden = store.isPlaying || store.isPaused) {
+function updateSubMarkerVisibility() {
   markerMeta.forEach(({ marker, type }) => {
-    if (type === 'sub') {
-      marker.getElement().style.visibility = hidden ? 'hidden' : 'visible'
-    }
+    const shouldHide = store.isPlaying || (store.isPaused && type === 'sub')
+    marker.getElement().style.visibility = shouldHide ? 'hidden' : 'visible'
   })
 }
 
@@ -825,19 +810,6 @@ watch(waypoints, redrawMarkers, { deep: true })
 watch(routes, updateRouteSource, { deep: true })
 watch(labelSize, () => { if (mapLoaded) redrawMarkers() })
 
-watch(iconSize, (size) => {
-  if (!animMarker) return
-  const el = animMarker.getElement()
-  el.style.fontSize = `${size}px`
-  const img = el.querySelector('img') as HTMLImageElement | null
-  if (img) img.style.width = img.style.height = `${size}px`
-})
-
-watch(() => store.icon, async (newIcon) => {
-  if (!map || !mapLoaded) return
-  const data = await getIconImageData(newIcon)
-  if (map.hasImage('anim-icon')) map.updateImage('anim-icon', data)
-})
 watch([isPlaying, isPaused], ([playing, paused]) => {
   if (playing && !paused) {
     startAnimation()
@@ -846,7 +818,7 @@ watch([isPlaying, isPaused], ([playing, paused]) => {
   } else if (!playing && !paused) {
     stopAnimation()
   }
-  updateSubMarkerVisibility(playing || paused)
+  updateSubMarkerVisibility()
 })
 
 onUnmounted(() => {
@@ -1537,19 +1509,21 @@ onUnmounted(() => {
   background: transparent;
 }
 
-.anim-marker {
-  line-height: 1;
-  cursor: default;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+.anim-icon-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 8;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.55));
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.anim-marker-img {
-  width: 40px;
-  height: 40px;
-  object-fit: cover;
+.anim-icon-img {
   border-radius: 50%;
+  object-fit: cover;
 }
 </style>
