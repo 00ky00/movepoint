@@ -597,9 +597,12 @@ onUnmounted(() => {
 /* クレジット */
 .credit-label {
   position: absolute;
-  bottom: 10px;
-  left: 10px;
+  top: 10px;
+  left: 54px;
   z-index: 10;
+  height: 36px;
+  display: flex;
+  align-items: center;
   color: rgba(255, 255, 255, 0.75);
   font-size: 11px;
   font-weight: 500;
@@ -607,16 +610,15 @@ onUnmounted(() => {
   letter-spacing: 0.06em;
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(6px);
-  padding: 3px 8px;
+  padding: 0 8px;
   border-radius: 6px;
 }
 
 @media (max-width: 640px) {
   .credit-label {
-    bottom: auto;
-    left: auto;
     top: 16px;
-    right: 16px;
+    left: 64px;
+    height: 40px;
   }
 }
 
