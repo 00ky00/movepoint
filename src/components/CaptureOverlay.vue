@@ -17,24 +17,24 @@
         :class="props.theme === 'light' ? 'image-modal-close--light' : ''"
         @click="emit('update:showImageModal', false)"><X :size="13" /></button>
       <img :src="capturedImageUrl" class="image-modal-preview" />
-      <p class="image-modal-hint" :class="props.theme === 'light' ? 'image-modal-hint--light' : ''">右クリック → 画像を保存</p>
-      <a :href="capturedImageUrl" download="movepoint.png"
-        class="image-modal-download"
-        :class="props.theme === 'light' ? 'image-modal-download--light' : ''">ダウンロード</a>
+      <div class="image-modal-footer">
+        <p class="image-modal-hint" :class="props.theme === 'light' ? 'image-modal-hint--light' : ''">右クリック → 画像を保存</p>
+        <a :href="capturedImageUrl" download="routesnap.png"
+          class="image-modal-download"
+          :class="props.theme === 'light' ? 'image-modal-download--light' : ''">ダウンロード</a>
+      </div>
     </div>
   </div>
 
   <!-- 画像プレビュー: モバイル全画面 -->
-  <div v-if="showImageModal"
-    class="mob-image-fullscreen sp-only"
-    :class="props.theme === 'light' ? 'mob-image-fullscreen--light' : ''">
-    <button class="mob-image-close"
-      :class="props.theme === 'light' ? 'mob-image-close--light' : ''"
-      @click="emit('update:showImageModal', false)"><X :size="16" /></button>
+  <div v-if="showImageModal" class="mob-image-fullscreen sp-only">
     <img :src="capturedImageUrl" class="mob-image-img" />
-    <a :href="capturedImageUrl" download="movepoint.png"
-      class="mob-image-save"
-      :class="props.theme === 'light' ? 'mob-image-save--light' : ''">保存する</a>
+    <div class="mob-image-actions">
+      <button class="mob-btn mob-btn--back" @click="emit('update:showImageModal', false)">戻る</button>
+      <a :href="capturedImageUrl" download="routesnap.png"
+        class="mob-btn mob-btn--save"
+        :class="props.theme === 'light' ? 'mob-btn--save-light' : ''">保存</a>
+    </div>
   </div>
 </template>
 
@@ -52,7 +52,6 @@ const emit = defineEmits<{
   (e: 'update:showImageModal', val: boolean): void
 }>()
 
-// suppress unused props lint
 void props
 </script>
 
@@ -65,10 +64,10 @@ void props
   .sp-only { display: flex; }
 }
 
+/* ── PC モーダル ───────────────────────────── */
 .modal-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -76,66 +75,83 @@ void props
   backdrop-filter: blur(4px);
 }
 
-.image-modal-backdrop {
-  background: rgba(0, 0, 0, 0.85);
-}
+.image-modal-backdrop { background: rgba(0, 0, 0, 0.85); }
+.image-modal-backdrop--light { background: rgba(240, 240, 245, 0.96); }
 
 .image-modal-box {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  max-height: 92vh;
+  gap: 14px;
   position: relative;
 }
 
 .image-modal-close {
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: -10px;
+  right: -10px;
   background: rgba(255, 255, 255, 0.15);
   border: none;
   color: white;
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  font-size: 13px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1;
 }
+.image-modal-close--light { background: rgba(0,0,0,0.08); color: #333; }
+.image-modal-close--light:hover { background: rgba(0,0,0,0.14); }
 
 .image-modal-preview {
-  max-height: 75vh;
-  max-width: 90vw;
+  max-height: 82vh;
+  width: auto;
   object-fit: contain;
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  display: block;
+}
+
+.image-modal-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .image-modal-hint {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.45);
   font-size: 12px;
   margin: 0;
-  text-align: center;
 }
+.image-modal-hint--light { color: #aaa; }
 
 .image-modal-download {
   color: white;
   font-size: 13px;
+  font-weight: 600;
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 6px 20px;
+  padding: 7px 22px;
   border-radius: 20px;
   text-decoration: none;
   transition: background 0.15s;
 }
-
 .image-modal-download:hover { background: rgba(255, 255, 255, 0.25); }
 
-/* キャプチャ待機オーバーレイ */
+.image-modal-download--light {
+  background: linear-gradient(135deg, #667eea, #764ba2 50%, #ed64a6);
+  border: none;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px 28px;
+  border-radius: 24px;
+  box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+}
+.image-modal-download--light:hover { opacity: 0.9; }
+
+/* ── キャプチャ待機 ────────────────────────── */
 .capture-overlay {
   position: absolute;
   inset: 0;
@@ -158,9 +174,7 @@ void props
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .capture-text {
   color: rgba(255,255,255,0.8);
@@ -168,7 +182,7 @@ void props
   font-weight: 500;
 }
 
-/* モバイル全画面プレビュー */
+/* ── モバイル全画面プレビュー ──────────────── */
 .mob-image-fullscreen {
   position: fixed;
   inset: 0;
@@ -180,97 +194,51 @@ void props
 }
 
 .mob-image-img {
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: auto;
+  max-height: 100dvh;
   object-fit: contain;
+  display: block;
 }
 
-.mob-image-close {
+.mob-image-actions {
   position: absolute;
-  top: max(16px, env(safe-area-inset-top));
-  right: 16px;
-  z-index: 51;
-  width: 36px;
-  height: 36px;
-  background: rgba(0,0,0,0.55);
-  border: 1px solid rgba(255,255,255,0.2);
-  color: white;
-  font-size: 16px;
-  border-radius: 50%;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24px 20px max(28px, env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 100%);
+  display: flex;
+  gap: 12px;
+}
+
+.mob-btn {
+  flex: 1;
+  padding: 15px;
+  border-radius: 24px;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
+  text-align: center;
+  text-decoration: none;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: opacity 0.15s;
 }
+.mob-btn:active { opacity: 0.8; }
 
-.mob-image-hint {
-  position: absolute;
-  bottom: max(24px, env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  color: rgba(255,255,255,0.5);
-  font-size: 12px;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-/* モバイル保存ボタン（元のhintの代わり） */
-.mob-image-save {
-  position: absolute;
-  bottom: max(32px, env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  color: white;
-  font-size: 14px;
-  font-weight: 700;
+.mob-btn--back {
   background: rgba(255,255,255,0.15);
-  border: 1px solid rgba(255,255,255,0.3);
-  padding: 12px 32px;
-  border-radius: 24px;
-  text-decoration: none;
-  white-space: nowrap;
+  border: 1px solid rgba(255,255,255,0.25);
+  color: white;
 }
 
-/* ライトテーマ */
-.image-modal-backdrop--light { background: rgba(240, 240, 245, 0.95); }
-
-.image-modal-close--light {
-  background: rgba(0,0,0,0.07);
-  color: #333;
-}
-.image-modal-close--light:hover { background: rgba(0,0,0,0.12); }
-
-.image-modal-hint--light { color: #999; }
-
-.image-modal-download--light {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #ed64a6 100%);
+.mob-btn--save {
+  background: linear-gradient(135deg, #667eea, #764ba2 50%, #ed64a6);
   border: none;
   color: white;
-  font-weight: 700;
-  font-size: 15px;
-  padding: 13px 36px;
-  border-radius: 28px;
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
-}
-.image-modal-download--light:hover { opacity: 0.9; }
-
-.mob-image-fullscreen--light { background: #f0f0f5; }
-
-.mob-image-close--light {
-  background: rgba(0,0,0,0.07);
-  border-color: rgba(0,0,0,0.08);
-  color: #333;
-}
-
-.mob-image-save--light {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #ed64a6 100%);
-  border: none;
-  color: white;
-  font-weight: 700;
-  font-size: 16px;
-  padding: 14px 40px;
-  border-radius: 28px;
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 16px rgba(102,126,234,0.4);
 }
 
 /* Transition */
