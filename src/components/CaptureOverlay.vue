@@ -31,9 +31,7 @@
     <img :src="capturedImageUrl" class="mob-image-img" />
     <div class="mob-image-actions">
       <button class="mob-btn mob-btn--back" @click="emit('update:showImageModal', false)">戻る</button>
-      <a :href="capturedImageUrl" download="routesnap.png"
-        class="mob-btn mob-btn--save"
-        :class="props.theme === 'light' ? 'mob-btn--save-light' : ''">保存</a>
+      <button class="mob-btn mob-btn--save" @click="saveImage">保存</button>
     </div>
   </div>
 </template>
@@ -51,6 +49,23 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:showImageModal', val: boolean): void
 }>()
+
+async function saveImage() {
+  const dataUrl = props.capturedImageUrl
+  try {
+    const res = await fetch(dataUrl)
+    const blob = await res.blob()
+    const file = new File([blob], 'routesnap.png', { type: 'image/png' })
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file] })
+      return
+    }
+  } catch { /* share失敗時はdownloadにフォールバック */ }
+  const a = document.createElement('a')
+  a.href = dataUrl
+  a.download = 'routesnap.png'
+  a.click()
+}
 
 void props
 </script>
