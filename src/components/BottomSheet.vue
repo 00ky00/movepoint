@@ -50,7 +50,7 @@
             </div>
             <button class="sheet-chip" @click="emit('selectFile')">画像を選択</button>
             <button v-if="store.icon.startsWith('blob:')" class="sheet-chip sheet-chip--reset"
-              @click="store.icon = store.routeMode === 'foot' ? '🚶' : '🚗'">✕</button>
+              @click="store.icon = store.routeMode === 'foot' ? '🚶' : '🚗'"><X :size="12" /></button>
           </div>
         </div>
       </div>
@@ -60,6 +60,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { X } from '@lucide/vue'
 import { useMapStore } from '../stores/mapStore'
 
 const TILE_STYLES = [

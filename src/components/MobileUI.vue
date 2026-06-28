@@ -3,27 +3,18 @@
   <button class="mob-mode-pill sp-only"
     @click="store.setRouteMode(store.routeMode === 'foot' ? 'driving' : 'foot')">
     <span class="mob-mode-text">{{ store.routeMode === 'foot' ? '散歩' : 'ドライブ' }}</span>
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" style="opacity:0.6;flex-shrink:0">
-      <path d="M3 5V8.5L1.5 7 0 8.5 3 11.5 6 8.5 4.5 7 3 8.5V5H3z"/>
-      <path d="M9 7V3.5L10.5 5 12 3.5 9 0.5 6 3.5 7.5 5 9 3.5V7H9z"/>
-    </svg>
+    <ArrowUpDown :size="12" style="opacity:0.6;flex-shrink:0" />
   </button>
 
   <!-- 設定ボタン -->
   <button class="mob-settings-btn sp-only" @click="emit('openSettings')">
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-      <rect x="2" y="4" width="16" height="2" rx="1"/>
-      <rect x="2" y="9" width="16" height="2" rx="1"/>
-      <rect x="2" y="14" width="16" height="2" rx="1"/>
-    </svg>
+    <Menu :size="20" />
   </button>
 
   <!-- 停止FAB（再生/一時停止中のみ） -->
   <Transition name="mob-fade">
     <button v-if="store.isPlaying || store.isPaused" class="mob-stop-fab sp-only" @click="store.stop()">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
-        <rect x="2" y="2" width="14" height="14" rx="2"/>
-      </svg>
+      <Square :size="16" />
     </button>
   </Transition>
 
@@ -32,24 +23,17 @@
     <button class="mob-side-btn mob-side-btn--text" @click="store.reset()">リセット</button>
     <button class="mob-play-btn" :disabled="!store.canPlay"
       @click="store.isPlaying ? store.pause() : store.play()">
-      <svg v-if="!store.isPlaying" width="26" height="26" viewBox="0 0 26 26" fill="currentColor">
-        <polygon points="6,3 23,13 6,23"/>
-      </svg>
-      <svg v-else width="26" height="26" viewBox="0 0 26 26" fill="currentColor">
-        <rect x="4" y="3" width="7" height="20" rx="1.5"/>
-        <rect x="15" y="3" width="7" height="20" rx="1.5"/>
-      </svg>
+      <Pause v-if="store.isPlaying" :size="26" />
+      <Play v-else :size="26" />
     </button>
     <button class="mob-side-btn" :disabled="!store.isPaused" @click="emit('capture')">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-        <circle cx="12" cy="13" r="4"/>
-      </svg>
+      <Camera :size="22" />
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ArrowUpDown, Menu, Square, Play, Pause, Camera } from '@lucide/vue'
 import { useMapStore } from '../stores/mapStore'
 
 const store = useMapStore()

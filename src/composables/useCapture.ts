@@ -9,6 +9,8 @@ export function useCapture(
   iconSize: Ref<number>,
   labelSize: Ref<number>,
   currentAnimPos: Ref<[number, number] | null>,
+  iconRotation?: Ref<number>,
+  markerColor?: string,
 ) {
   const store = useMapStore()
   const isCapturing = ref(false)
@@ -113,42 +115,58 @@ export function useCapture(
       }
     }
 
-    const r = 24
-    store.waypoints
-      .filter(wp => wp.type === 'main')
-      .forEach(wp => {
+    const r = 36
+    store.waypoints.forEach(wp => {
         const { x, y } = project(wp.lng, wp.lat)
 
         ctx.beginPath()
         ctx.arc(x, y, r, 0, Math.PI * 2)
-        ctx.fillStyle = wp.type === 'main' ? '#0d6efd' : '#ffc107'
+        if (wp.type === 'main') {
+          const grad = ctx.createLinearGradient(x - r, y - r, x + r, y + r)
+          const stops = (markerColor ?? '#667eea,#764ba2').split(',')
+          grad.addColorStop(0, stops[0])
+          grad.addColorStop(1, stops[1] ?? stops[0])
+          ctx.fillStyle = grad
+        } else {
+          ctx.fillStyle = '#94a3b8'
+        }
         ctx.fill()
         ctx.strokeStyle = 'white'
-        ctx.lineWidth = 3
+        ctx.lineWidth = 4
         ctx.stroke()
 
-        ctx.fillStyle = wp.type === 'main' ? 'white' : '#212529'
-        ctx.font = 'bold 18px sans-serif'
+        ctx.fillStyle = 'white'
+        ctx.font = 'bold 26px sans-serif'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         ctx.fillText(String(wp.order), x, y)
 
         if (wp.label) {
-          const labelY = y + r + 6
+          const labelY = y + r + 8
           const drawLabelSize = Math.round(
             (labelSize.value * outW * dpr) / sw,
           )
-          ctx.font = `${drawLabelSize}px sans-serif`
+          ctx.font = `bold ${drawLabelSize}px 'Noto Sans JP', sans-serif`
           const tw = ctx.measureText(wp.label).width
-          const lw = tw + 16,
-            lh = drawLabelSize + 10
-          ctx.fillStyle = 'rgba(0,0,0,0.65)'
-          ctx.beginPath()
-          ctx.roundRect(x - lw / 2, labelY, lw, lh, 5)
-          ctx.fill()
+          const padX = drawLabelSize * 0.6
+          const padY = drawLabelSize * 0.35
+          const lw = tw + padX * 2
+          const lh = drawLabelSize + padY * 2
+          const radius = lh / 2
+          // 白ピル with shadow
+          ctx.shadowColor = 'rgba(0,0,0,0.18)'
+          ctx.shadowBlur = 14
+          ctx.shadowOffsetY = 3
           ctx.fillStyle = 'white'
+          ctx.beginPath()
+          ctx.roundRect(x - lw / 2, labelY, lw, lh, radius)
+          ctx.fill()
+          ctx.shadowColor = 'transparent'
+          ctx.shadowBlur = 0
+          ctx.shadowOffsetY = 0
+          ctx.fillStyle = '#1a1a1a'
           ctx.textBaseline = 'top'
-          ctx.fillText(wp.label, x, labelY + 5)
+          ctx.fillText(wp.label, x, labelY + padY)
         }
       })
 
@@ -158,52 +176,62 @@ export function useCapture(
         currentAnimPos.value[1],
       )
       const drawSize = Math.round((iconSize.value * outW * dpr) / sw)
+      const rot = ((iconRotation?.value ?? 0) * Math.PI) / 180
+
+      ctx.save()
+      ctx.translate(x, y)
+      if (rot !== 0) ctx.rotate(rot)
+
       if (!store.icon.startsWith('blob:')) {
         ctx.font = `${drawSize}px serif`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        ctx.fillText(store.icon, x, y)
+        ctx.fillText(store.icon, 0, 0)
       } else {
         await new Promise<void>(resolve => {
           const img = new Image()
           img.onload = () => {
-            ctx.drawImage(
-              img,
-              x - drawSize / 2,
-              y - drawSize / 2,
-              drawSize,
-              drawSize,
-            )
+            ctx.drawImage(img, -drawSize / 2, -drawSize / 2, drawSize, drawSize)
             resolve()
           }
           img.onerror = () => resolve()
           img.src = store.icon
         })
       }
+
+      ctx.restore()
     }
 
-    // ルートスナップ ロゴ（左下・モダン）
-    const logoSize = Math.round(outW * 0.042)
-    const logoText = 'ルートスナップ'
-    ctx.font = `bold ${logoSize}px 'Hiragino Kaku Gothic Pro', 'Noto Sans JP', sans-serif`
+    // ロゴ（右上・ローマ字・モダン）
+    const logoSize = Math.round(outW * 0.036)
+    const logoRx = outW - 56  // 右端基準
+    const logoTy = 64          // 上端基準
+
+    ctx.textBaseline = 'top'
     ctx.textAlign = 'left'
-    ctx.textBaseline = 'bottom'
-    const lx = 52
-    const ly = outH - 52
-    // ドロップシャドウ
-    ctx.shadowColor = 'rgba(0,0,0,0.6)'
+
+    // "Route" と "Snap" を別スタイルで右寄せ描画
+    ctx.font = `300 ${logoSize}px 'Helvetica Neue', Arial, sans-serif`
+    const routeW = ctx.measureText('Route').width
+    ctx.font = `bold ${logoSize}px 'Helvetica Neue', Arial, sans-serif`
+    const snapW = ctx.measureText('Snap').width
+    const totalW = routeW + Math.round(logoSize * 0.08) + snapW
+
+    ctx.shadowColor = 'rgba(0,0,0,0.45)'
     ctx.shadowBlur = 18
-    ctx.shadowOffsetX = 0
-    ctx.shadowOffsetY = 4
+    ctx.shadowOffsetY = 2
+
+    ctx.font = `300 ${logoSize}px 'Helvetica Neue', Arial, sans-serif`
+    ctx.fillStyle = 'rgba(255,255,255,0.75)'
+    ctx.fillText('Route', logoRx - totalW, logoTy)
+
+    ctx.font = `bold ${logoSize}px 'Helvetica Neue', Arial, sans-serif`
     ctx.fillStyle = 'white'
-    ctx.fillText(logoText, lx, ly)
-    // アクセントライン
+    ctx.fillText('Snap', logoRx - snapW, logoTy)
+
     ctx.shadowColor = 'transparent'
     ctx.shadowBlur = 0
     ctx.shadowOffsetY = 0
-    const tm2 = ctx.measureText(logoText)
-    ctx.fillStyle = '#0d6efd'
-    ctx.fillRect(lx, ly + 6, tm2.width, Math.round(outW * 0.006))
 
     capturedImageUrl.value = outCanvas.toDataURL('image/png')
     isCapturing.value = false

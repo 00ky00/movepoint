@@ -62,10 +62,7 @@
 
     <!-- ヘルプボタン -->
     <button class="help-btn" @click="showHelpModal = true">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-        <circle cx="8" cy="8" r="7.5" fill="none" stroke="currentColor" stroke-width="1.2"/>
-        <text x="8" y="12.5" text-anchor="middle" font-size="10" font-weight="bold" font-family="serif">i</text>
-      </svg>
+      <Info :size="16" />
     </button>
 
     <!-- ヘルプモーダル -->
@@ -85,6 +82,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { Info } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import maplibregl from 'maplibre-gl'
 import type { GeoJSONSource } from 'maplibre-gl'
@@ -180,6 +178,8 @@ const { isCapturing, showImageModal, capturedImageUrl, captureImage } = useCaptu
   iconSize,
   labelSize,
   currentAnimPos,
+  undefined,
+  '#667eea,#764ba2',
 )
 
 // ── ポイントシート ───────────────────────────────────────
@@ -268,42 +268,35 @@ function onFileSelect(e: Event) {
 }
 
 // ── ルート描画 ────────────────────────────────────────────
-function buildRouteGeoJSON(routeCoords: [number, number][][]) {
+function buildMergedRouteFeature(coords: [number, number][][]) {
   return {
-    type: 'FeatureCollection' as const,
-    features: routeCoords.map(coords => ({
-      type: 'Feature' as const,
-      geometry: { type: 'LineString' as const, coordinates: coords },
-      properties: {},
-    })),
+    type: 'Feature' as const,
+    geometry: { type: 'LineString' as const, coordinates: coords.flat() },
+    properties: {},
   }
 }
 
 function updateRouteSource() {
   if (!map || !mapLoaded) return
   const source = map.getSource('routes') as GeoJSONSource | undefined
-  if (source) source.setData(buildRouteGeoJSON(store.routes))
+  if (source) source.setData(buildMergedRouteFeature(store.routes))
 }
 
 // ── マーカー ──────────────────────────────────────────────
 function createMarkerEl(order: number, type: 'main' | 'sub', label?: string) {
-  const wrapper = document.createElement('div')
-  wrapper.className = 'marker-wrapper'
-
   const circle = document.createElement('div')
   circle.className = `map-marker map-marker--${type}`
   circle.textContent = String(order)
-  wrapper.appendChild(circle)
 
   if (label) {
     const labelEl = document.createElement('div')
     labelEl.className = 'marker-label'
     labelEl.style.fontSize = `${labelSize.value}px`
     labelEl.textContent = label
-    wrapper.appendChild(labelEl)
+    circle.appendChild(labelEl)
   }
 
-  return { wrapper, circle }
+  return { wrapper: circle, circle }
 }
 
 function showLabelInput(id: string) {
@@ -506,7 +499,8 @@ onMounted(() => {
 
     map!.addSource('routes', {
       type: 'geojson',
-      data: buildRouteGeoJSON(store.routes),
+      data: buildMergedRouteFeature(store.routes),
+      lineMetrics: true,
     })
 
     map!.addLayer({
@@ -514,19 +508,22 @@ onMounted(() => {
       type: 'line',
       source: 'routes',
       paint: {
-        'line-color': '#0d6efd',
-        'line-width': 4,
-        'line-opacity': 0.8,
+        'line-width': 7,
+        'line-opacity': 0.9,
+        'line-gradient': [
+          'interpolate', ['linear'], ['line-progress'],
+          0, '#667eea',
+          0.5, '#9f7aea',
+          1, '#ed64a6',
+        ],
       },
-      layout: {
-        'line-join': 'round',
-        'line-cap': 'round',
-      },
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
     })
 
     map!.addSource('routes-trail', {
       type: 'geojson',
       data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} },
+      lineMetrics: true,
     })
 
     map!.addLayer({
@@ -534,15 +531,16 @@ onMounted(() => {
       type: 'line',
       source: 'routes-trail',
       paint: {
-        'line-color': '#0d6efd',
-        'line-width': 4,
+        'line-width': 7,
         'line-opacity': 1,
+        'line-gradient': [
+          'interpolate', ['linear'], ['line-progress'],
+          0, '#667eea',
+          0.5, '#9f7aea',
+          1, '#ed64a6',
+        ],
       },
-      layout: {
-        visibility: 'none',
-        'line-join': 'round',
-        'line-cap': 'round',
-      },
+      layout: { visibility: 'none', 'line-join': 'round', 'line-cap': 'round' },
     })
 
     map!.addSource('anim-point', {
@@ -666,48 +664,46 @@ onUnmounted(() => {
 
 <style>
 .map-marker {
-  width: 28px;
-  height: 28px;
+  position: relative;
+  overflow: visible;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: bold;
+  font-size: 15px;
+  font-weight: 700;
   color: white;
-  border: 2px solid white;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  border: 3px solid white;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.25);
   cursor: grab;
   user-select: none;
 }
 
-.map-marker:active {
-  cursor: grabbing;
-}
+.map-marker:active { cursor: grabbing; }
 
 .map-marker--main {
-  background-color: #0d6efd;
+  background: linear-gradient(135deg, #667eea, #764ba2);
 }
 
 .map-marker--sub {
-  background-color: #ffc107;
-  color: #212529;
-}
-
-.marker-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  background: #94a3b8;
 }
 
 .marker-label {
-  background: rgba(0, 0, 0, 0.65);
-  color: white;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  color: #333;
   font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
   white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   pointer-events: none;
 }
 

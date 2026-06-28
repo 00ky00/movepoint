@@ -8,28 +8,44 @@
   </Transition>
 
   <!-- 画像プレビュー: PC モーダル -->
-  <div v-if="showImageModal" class="modal-backdrop image-modal-backdrop pc-only" @click.self="emit('update:showImageModal', false)">
+  <div v-if="showImageModal"
+    class="modal-backdrop image-modal-backdrop pc-only"
+    :class="props.theme === 'light' ? 'image-modal-backdrop--light' : ''"
+    @click.self="emit('update:showImageModal', false)">
     <div class="image-modal-box">
-      <button class="image-modal-close" @click="emit('update:showImageModal', false)">✕</button>
+      <button class="image-modal-close"
+        :class="props.theme === 'light' ? 'image-modal-close--light' : ''"
+        @click="emit('update:showImageModal', false)"><X :size="13" /></button>
       <img :src="capturedImageUrl" class="image-modal-preview" />
-      <p class="image-modal-hint">右クリック → 画像を保存</p>
-      <a :href="capturedImageUrl" download="movepoint.png" class="image-modal-download">ダウンロード</a>
+      <p class="image-modal-hint" :class="props.theme === 'light' ? 'image-modal-hint--light' : ''">右クリック → 画像を保存</p>
+      <a :href="capturedImageUrl" download="movepoint.png"
+        class="image-modal-download"
+        :class="props.theme === 'light' ? 'image-modal-download--light' : ''">ダウンロード</a>
     </div>
   </div>
 
   <!-- 画像プレビュー: モバイル全画面 -->
-  <div v-if="showImageModal" class="mob-image-fullscreen sp-only">
-    <button class="mob-image-close" @click="emit('update:showImageModal', false)">✕</button>
+  <div v-if="showImageModal"
+    class="mob-image-fullscreen sp-only"
+    :class="props.theme === 'light' ? 'mob-image-fullscreen--light' : ''">
+    <button class="mob-image-close"
+      :class="props.theme === 'light' ? 'mob-image-close--light' : ''"
+      @click="emit('update:showImageModal', false)"><X :size="16" /></button>
     <img :src="capturedImageUrl" class="mob-image-img" />
-    <p class="mob-image-hint">長押しで保存</p>
+    <a :href="capturedImageUrl" download="movepoint.png"
+      class="mob-image-save"
+      :class="props.theme === 'light' ? 'mob-image-save--light' : ''">保存する</a>
   </div>
 </template>
 
 <script setup lang="ts">
+import { X } from '@lucide/vue'
+
 const props = defineProps<{
   isCapturing: boolean
   showImageModal: boolean
   capturedImageUrl: string
+  theme?: 'dark' | 'light'
 }>()
 
 const emit = defineEmits<{
@@ -196,6 +212,65 @@ void props
   font-size: 12px;
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* モバイル保存ボタン（元のhintの代わり） */
+.mob-image-save {
+  position: absolute;
+  bottom: max(32px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 12px 32px;
+  border-radius: 24px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* ライトテーマ */
+.image-modal-backdrop--light { background: rgba(240, 240, 245, 0.95); }
+
+.image-modal-close--light {
+  background: rgba(0,0,0,0.07);
+  color: #333;
+}
+.image-modal-close--light:hover { background: rgba(0,0,0,0.12); }
+
+.image-modal-hint--light { color: #999; }
+
+.image-modal-download--light {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #ed64a6 100%);
+  border: none;
+  color: white;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 13px 36px;
+  border-radius: 28px;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+}
+.image-modal-download--light:hover { opacity: 0.9; }
+
+.mob-image-fullscreen--light { background: #f0f0f5; }
+
+.mob-image-close--light {
+  background: rgba(0,0,0,0.07);
+  border-color: rgba(0,0,0,0.08);
+  color: #333;
+}
+
+.mob-image-save--light {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #ed64a6 100%);
+  border: none;
+  color: white;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 14px 40px;
+  border-radius: 28px;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
 }
 
 /* Transition */

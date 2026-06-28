@@ -28,7 +28,7 @@ export function useAnimation(
     return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
   }
 
-  function startAnimation() {
+  function startAnimation(onComplete?: () => void) {
     const coords = getAllCoords()
     if (coords.length < 2) return
 
@@ -67,6 +67,10 @@ export function useAnimation(
       }
 
       if (progress >= 1) {
+        if (onComplete) {
+          onComplete()
+          return
+        }
         animOffset = 0
         animLastTime = performance.now()
       }

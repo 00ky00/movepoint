@@ -8,11 +8,11 @@
       <div class="panel-section">
         <div class="section-label">ルートモード</div>
         <div class="mode-toggle">
-          <span class="mode-icon" :class="{ active: store.routeMode === 'foot' }">🚶</span>
+          <span class="mode-icon" :class="{ active: store.routeMode === 'foot' }"><Footprints :size="20" /></span>
           <div class="toggle-track" @click="store.setRouteMode(store.routeMode === 'foot' ? 'driving' : 'foot')">
             <div class="toggle-thumb" :class="{ right: store.routeMode === 'driving' }"></div>
           </div>
-          <span class="mode-icon" :class="{ active: store.routeMode === 'driving' }">🚗</span>
+          <span class="mode-icon" :class="{ active: store.routeMode === 'driving' }"><Car :size="20" /></span>
         </div>
       </div>
 
@@ -48,13 +48,15 @@
           class="ctrl-btn ctrl-btn--play"
           :disabled="!store.canPlay"
           @click="store.isPlaying ? store.pause() : store.play()"
-        >{{ store.isPlaying ? '⏸' : '▶' }}</button>
-        <button class="ctrl-btn" :disabled="!store.isPlaying && !store.isPaused" @click="store.stop()">⏹</button>
+        >
+          <Pause v-if="store.isPlaying" :size="22" />
+          <Play v-else :size="22" />
+        </button>
+        <button class="ctrl-btn" :disabled="!store.isPlaying && !store.isPaused" @click="store.stop()">
+          <Square :size="22" />
+        </button>
         <button class="ctrl-btn" :disabled="!store.isPaused" @click="emit('capture')">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-            <circle cx="12" cy="13" r="4"/>
-          </svg>
+          <Camera :size="22" />
         </button>
         <button class="ctrl-btn ctrl-btn--text" @click="store.reset()">リセット</button>
       </div>
@@ -76,7 +78,7 @@
           </div>
           <button class="icon-upload-btn" @click="emit('selectFile')">画像を選択</button>
           <button v-if="store.icon.startsWith('blob:')" class="icon-reset-btn"
-            @click="store.icon = store.routeMode === 'foot' ? '🚶' : '🚗'">✕</button>
+            @click="store.icon = store.routeMode === 'foot' ? '🚶' : '🚗'"><X :size="12" /></button>
         </div>
       </div>
 
@@ -90,9 +92,7 @@
               {{ wp.order }}
             </div>
             <span class="wp-list-label">{{ wp.label || '（ラベルなし）' }}</span>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" class="wp-list-edit-icon">
-              <path d="M9.5 1.5a1.5 1.5 0 012.12 2.12L4.5 10.75 2 11.5l.75-2.5L9.5 1.5z"/>
-            </svg>
+            <Pencil :size="14" class="wp-list-edit-icon" />
           </button>
         </div>
       </div>
@@ -103,6 +103,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { Footprints, Car, Play, Pause, Square, Camera, X, Pencil } from '@lucide/vue'
 import { useMapStore } from '../stores/mapStore'
 
 const TILE_STYLES = [
